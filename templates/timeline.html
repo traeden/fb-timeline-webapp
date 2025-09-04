@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Sep  3 14:57:58 2025
+
+@author: traedennord
+"""
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Facebook Timeline</title>
+</head>
+<body>
+    <h1>My Facebook Timeline</h1>
+    <p>User: {{ user_data.name }}</p>
+    {% if posts %}
+        <ul>
+        {% for post in posts %}
+            <li>
+                <p><strong>Post ID:</strong> {{ post.facebook_id }}</p>
+                <p><strong>Message:</strong> {{ post.message or 'No message' }}</p>
+                <p><strong>Created:</strong> {{ post.created_time }}</p>
+                {% if post.photo_url %}
+                    <img src="{{ post.photo_url }}" alt="Post Photo" style="max-width: 300px;">
+                {% endif %}
+                {% if post.video_url %}
+                    <video controls src="{{ post.video_url }}" style="max-width: 300px;"></video>
+                {% endif %}
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No posts available</p>
+    {% endif %}
+    <a href="{{ url_for('home') }}">Back to Home</a>
+</body>
+</html>
