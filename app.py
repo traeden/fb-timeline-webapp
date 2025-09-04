@@ -5,7 +5,6 @@ Created on Wed Sep  3 10:11:49 2025
 
 @author: traedennord
 """
-
 from flask import Flask, redirect, request, session, url_for, render_template
 from flask_sqlalchemy import SQLAlchemy
 import os
@@ -25,6 +24,8 @@ class Post(db.Model):
     facebook_id = db.Column(db.String(100), unique=True)
     message = db.Column(db.Text)
     created_time = db.Column(db.String(50))
+    photo_url = db.Column(db.String(2000), nullable=True)  # Increased from 500
+    video_url = db.Column(db.String(2000), nullable=True)  # Increased from 500    video_url = db.Column(db.String(500), nullable=True)  # Added for video URL
 
 FB_APP_ID = os.getenv('FB_APP_ID')
 FB_APP_SECRET = os.getenv('FB_APP_SECRET')
@@ -37,11 +38,11 @@ def home():
 @app.route('/login')
 def login():
     fb_login_url = (
-        f'https://www.facebook.com/v18.0/dialog/oauth'
-        f'?client_id={FB_APP_ID}'
-        f'&redirect_uri={REDIRECT_URI}'
-        f'&scope=public_profile,user_posts'
-    )
+    f'https://www.facebook.com/v18.0/dialog/oauth'
+    f'?client_id={FB_APP_ID}'
+    f'&redirect_uri={REDIRECT_URI}'
+    f'&scope=public_profile,user_posts,user_videos'
+)    
     return redirect(fb_login_url)
 
 @app.route('/callback')
@@ -82,26 +83,40 @@ def timeline():
         return f"Error fetching user data: {data['error']['message']}", 500
     user_data = data
     
-    # Fetch posts
+    # Fetch posts with media
     posts_url = (
         f'https://graph.facebook.com/v18.0/me/feed'
         f'?access_token={access_token}'
-        f'&fields=id,message,created_time'
+        f'&fields=id,message,created_time,attachments{{type,media}}'
     )
     posts_response = requests.get(posts_url)
     posts_data = posts_response.json()
     if 'error' in posts_data:
         return f"Error fetching posts: {posts_data['error']['message']}", 500
     
+    print(posts_data)  # Debug output
+    
     # Store posts in database
     with app.app_context():
         for post in posts_data.get('data', []):
             existing_post = Post.query.filter_by(facebook_id=post['id']).first()
             if not existing_post:
+                attachments = post.get('attachments', {}).get('data', [])
+                photo_url = ''
+                video_url = ''
+                if attachments:
+                    for attachment in attachments:
+                        media = attachment.get('media', {})
+                        if attachment.get('type') == 'photo':
+                            photo_url = media.get('image', {}).get('src', '')
+                        elif attachment.get('type') in ['video', 'video_inline']:  # Updated to include video_inline
+                            video_url = media.get('source', '')
                 new_post = Post(
                     facebook_id=post['id'],
                     message=post.get('message', ''),
-                    created_time=post['created_time']
+                    created_time=post['created_time'],
+                    photo_url=photo_url,
+                    video_url=video_url
                 )
                 db.session.add(new_post)
         db.session.commit()
