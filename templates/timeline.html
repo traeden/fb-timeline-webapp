@@ -6,33 +6,118 @@ Created on Wed Sep  3 14:57:58 2025
 @author: traedennord
 """
 
-<!DOCTYPE html>
-<html>
-<head>
-    <title>My Facebook Timeline</title>
-</head>
-<body>
-    <h1>My Facebook Timeline</h1>
-    <p>User: {{ user_data.name }}</p>
-    {% if posts %}
-        <ul>
-        {% for post in posts %}
-            <li>
-                <p><strong>Post ID:</strong> {{ post.facebook_id }}</p>
-                <p><strong>Message:</strong> {{ post.message or 'No message' }}</p>
-                <p><strong>Created:</strong> {{ post.created_time }}</p>
-                {% if post.photo_url %}
-                    <img src="{{ post.photo_url }}" alt="Post Photo" style="max-width: 300px;">
-                {% endif %}
-                {% if post.video_url %}
-                    <video controls src="{{ post.video_url }}" style="max-width: 300px;"></video>
-                {% endif %}
-            </li>
-        {% endfor %}
-        </ul>
-    {% else %}
-        <p>No posts available</p>
+{% extends "bootstrap/base.html" %}
+{% block title %}My Facebook Timeline{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">My Facebook Timeline</h1>
+    <p class="lead">User: {{ user_data.name }}</p>
+
+<!-- Filter Form -->
+<form method="GET" class="mb-4">
+    <div class="row g-3">
+        <div class="col-md-3">
+            <label for="start_date" class="form-label">Start Date:</label>
+            <input type="date" id="start_date" name="start_date" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label for="end_date" class="form-label">End Date:</label>
+            <input type="date" id="end_date" name="end_date" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label for="keyword" class="form-label">Keyword Search:</label>
+            <input type="text" id="keyword" name="keyword" class="form-control" placeholder="Enter keyword">
+        </div>
+        <div class="col-md-3">
+            <label>&nbsp;</label> <!-- Spacer -->
+        </div>
+    </div>
+    <div class="row g-3 mt-3">
+        <div class="col-md-2">
+            <label class="form-label">Has Photo:</label>
+            <select name="has_photo" class="form-control">
+                <option value="">Any</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Has Video:</label>
+            <select name="has_video" class="form-control">
+                <option value="">Any</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Min Length:</label>
+            <input type="number" name="min_length" class="form-control" placeholder="0" min="0">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Max Length:</label>
+            <input type="number" name="max_length" class="form-control" placeholder="Max">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Tagged (People/Places):</label>
+            <select name="has_tags" class="form-control">
+                <option value="">Any</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+            </select>
+        </div>
+    </div>
+    <div class="row mt-3">
+        <div class="col-md-6">
+            <button type="submit" class="btn btn-primary w-100">Apply Filters</button>
+        </div>
+        <div class="col-md-6">
+            <a href="{{ url_for('timeline', clear_filters='true') }}" class="btn btn-secondary w-100">Clear Filters</a>
+        </div>
+    </div>
+    <!-- Filter Summary Bar -->
+    {% if request.args %}
+    <div class="mt-3 p-2 bg-light text-muted small" style="border-radius: 5px;">
+        Applied Filters:
+        {% if request.args.get('start_date') %} Start Date: {{ request.args.get('start_date') }}{% endif %}
+        {% if request.args.get('end_date') %} | End Date: {{ request.args.get('end_date') }}{% endif %}
+        {% if request.args.get('keyword') %} | Keyword: {{ request.args.get('keyword') }}{% endif %}
+        {% if request.args.get('has_photo') and request.args.get('has_photo') != '' %} | Has Photo: {{ request.args.get('has_photo') }}{% endif %}
+        {% if request.args.get('has_video') and request.args.get('has_video') != '' %} | Has Video: {{ request.args.get('has_video') }}{% endif %}
+        {% if request.args.get('min_length') %} | Min Length: {{ request.args.get('min_length') }}{% endif %}
+        {% if request.args.get('max_length') %} | Max Length: {{ request.args.get('max_length') }}{% endif %}
+        {% if request.args.get('has_tags') and request.args.get('has_tags') != '' %} | Tagged: {{ request.args.get('has_tags') }}{% endif %}
+    </div>
     {% endif %}
-    <a href="{{ url_for('home') }}">Back to Home</a>
-</body>
-</html>
+</form>
+
+    <!-- Post Display -->
+    {% if posts %}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for post in posts %}
+                <div class="col">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Post ID: {{ post.facebook_id }}</h5>
+                            <p class="card-text"><strong>Message:</strong> {{ post.message or 'No message' }}</p>
+                            <p class="card-text"><strong>Created:</strong> {{ post.created_time }}</p>
+                            {% if post.photo_url %}
+                                <img src="{{ post.photo_url }}" class="card-img-top" alt="Post Photo" style="max-height: 200px; object-fit: cover;">
+                            {% endif %}
+                            {% if post.video_url %}
+                                <video controls class="card-video w-100" style="max-height: 200px;">
+                                    <source src="{{ post.video_url }}" type="video/mp4">
+                                </video>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-muted">No posts available</p>
+    {% endif %}
+
+    <a href="{{ url_for('home') }}" class="btn btn-primary mt-4">Back to Home</a>
+</div>
+{% endblock %}
