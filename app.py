@@ -1,18 +1,15 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Sep  3 10:11:49 2025
-
-@author: traedennord
-"""
 from flask import Flask, redirect, request, session, url_for, render_template
 from flask_sqlalchemy import SQLAlchemy
+from flask_bootstrap import Bootstrap
+from sqlalchemy import func
 import os
 from dotenv import load_dotenv
 import requests
 
 load_dotenv()
 app = Flask(__name__)
+bootstrap = Bootstrap(app)
+
 app.secret_key = 'xyz789abc123'
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://localhost/timeline'
@@ -24,8 +21,8 @@ class Post(db.Model):
     facebook_id = db.Column(db.String(100), unique=True)
     message = db.Column(db.Text)
     created_time = db.Column(db.String(50))
-    photo_url = db.Column(db.String(2000), nullable=True)  # Increased from 500
-    video_url = db.Column(db.String(2000), nullable=True)  # Increased from 500    video_url = db.Column(db.String(500), nullable=True)  # Added for video URL
+    photo_url = db.Column(db.String(2000), nullable=True)
+    video_url = db.Column(db.String(2000), nullable=True)
 
 FB_APP_ID = os.getenv('FB_APP_ID')
 FB_APP_SECRET = os.getenv('FB_APP_SECRET')
@@ -38,11 +35,11 @@ def home():
 @app.route('/login')
 def login():
     fb_login_url = (
-    f'https://www.facebook.com/v18.0/dialog/oauth'
-    f'?client_id={FB_APP_ID}'
-    f'&redirect_uri={REDIRECT_URI}'
-    f'&scope=public_profile,user_posts,user_videos'
-)    
+        f'https://www.facebook.com/v18.0/dialog/oauth'
+        f'?client_id={FB_APP_ID}'
+        f'&redirect_uri={REDIRECT_URI}'
+        f'&scope=public_profile,user_posts'
+    )
     return redirect(fb_login_url)
 
 @app.route('/callback')
@@ -94,8 +91,6 @@ def timeline():
     if 'error' in posts_data:
         return f"Error fetching posts: {posts_data['error']['message']}", 500
     
-    print(posts_data)  # Debug output
-    
     # Store posts in database
     with app.app_context():
         for post in posts_data.get('data', []):
@@ -106,11 +101,10 @@ def timeline():
                 video_url = ''
                 if attachments:
                     for attachment in attachments:
-                        media = attachment.get('media', {})
                         if attachment.get('type') == 'photo':
-                            photo_url = media.get('image', {}).get('src', '')
-                        elif attachment.get('type') in ['video', 'video_inline']:  # Updated to include video_inline
-                            video_url = media.get('source', '')
+                            photo_url = attachment.get('media', {}).get('image', {}).get('src', '')
+                        elif attachment.get('type') in ['video', 'video_inline']:
+                            video_url = attachment.get('media', {}).get('source', '')
                 new_post = Post(
                     facebook_id=post['id'],
                     message=post.get('message', ''),
@@ -121,7 +115,46 @@ def timeline():
                 db.session.add(new_post)
         db.session.commit()
     
-    db_posts = Post.query.all()
+    # Apply filters or clear them
+    query = Post.query
+    clear_filters = request.args.get('clear_filters')
+    if clear_filters == 'true':
+        # Reset to all posts, no filters
+        db_posts = query.all()
+    else:
+        # Apply filters
+        start_date = request.args.get('start_date')
+        if start_date:
+            query = query.filter(Post.created_time >= start_date)
+        end_date = request.args.get('end_date')
+        if end_date:
+            query = query.filter(Post.created_time <= end_date)
+        keyword = request.args.get('keyword')
+        if keyword:
+            query = query.filter(Post.message.ilike(f'%{keyword}%'))
+        has_photo = request.args.get('has_photo')
+        if has_photo == 'yes':
+            query = query.filter(Post.photo_url != '')
+        elif has_photo == 'no':
+            query = query.filter(Post.photo_url == '')
+        has_video = request.args.get('has_video')
+        if has_video == 'yes':
+            query = query.filter(Post.video_url != '')
+        elif has_video == 'no':
+            query = query.filter(Post.video_url == '')
+        min_length = request.args.get('min_length')
+        if min_length:
+            query = query.filter(func.length(Post.message) >= int(min_length))
+        max_length = request.args.get('max_length')
+        if max_length:
+            query = query.filter(func.length(Post.message) <= int(max_length))
+        has_tags = request.args.get('has_tags')
+        if has_tags == 'yes':
+            query = query.filter(Post.message.ilike('%@%'))
+        elif has_tags == 'no':
+            query = query.filter(~Post.message.ilike('%@%'))
+        db_posts = query.all()
+    
     return render_template('timeline.html', posts=db_posts, user_data=user_data)
 
 if __name__ == '__main__':
