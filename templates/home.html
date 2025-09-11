@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Sep 11 12:14:40 2025
+
+@author: traedennord
+"""
+{% extends "bootstrap/base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-xl-6">
+            <!-- Header Section -->
+            <div class="text-center mb-5">
+                <h1 class="display-4 mb-3">Facebook Timeline Explorer</h1>
+                <p class="lead text-muted">Connect to Facebook and filter your timeline data with precision</p>
+            </div>
+
+            <!-- Filter Card -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-filter me-2"></i>API Data Filters
+                    </h5>
+                    <small class="opacity-75">These filters limit the data fetched from Facebook's API</small>
+                </div>
+                <div class="card-body">
+                    <form method="GET" action="/login">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="api_start_date" class="form-label fw-semibold">
+                                    <i class="far fa-calendar-alt me-1"></i>Start Date
+                                </label>
+                                <input type="date" id="api_start_date" name="api_start_date" 
+                                       class="form-control form-control-lg">
+                                <small class="text-muted">Fetch posts from this date onwards</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="api_end_date" class="form-label fw-semibold">
+                                    <i class="far fa-calendar-alt me-1"></i>End Date
+                                </label>
+                                <input type="date" id="api_end_date" name="api_end_date" 
+                                       class="form-control form-control-lg">
+                                <small class="text-muted">Fetch posts up to this date</small>
+                            </div>
+                            <div class="col-12">
+                                <label for="api_post_type" class="form-label fw-semibold">
+                                    <i class="fas fa-layer-group me-1"></i>Post Type
+                                </label>
+                                <select id="api_post_type" name="api_post_type" 
+                                        class="form-select form-select-lg">
+                                    <option value="">Any Type</option>
+                                    <option value="photo">📷 Photos Only</option>
+                                    <option value="video">🎥 Videos Only</option>
+                                    <option value="status">💭 Status Updates Only</option>
+                                </select>
+                                <small class="text-muted">Filter by specific content type</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Submit Button -->
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fab fa-facebook-f me-2"></i>Connect with Facebook
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Info Section -->
+            <div class="row mt-4">
+                <div class="col-md-4">
+                    <div class="text-center p-3">
+                        <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-2" 
+                             style="width: 50px; height: 50px;">
+                            <i class="fas fa-shield-alt text-primary"></i>
+                        </div>
+                        <h6 class="fw-semibold">Secure</h6>
+                        <small class="text-muted">Your data stays private</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center p-3">
+                        <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-2" 
+                             style="width: 50px; height: 50px;">
+                            <i class="fas fa-search text-primary"></i>
+                        </div>
+                        <h6 class="fw-semibold">Searchable</h6>
+                        <small class="text-muted">Find specific posts easily</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center p-3">
+                        <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-2" 
+                             style="width: 50px; height: 50px;">
+                            <i class="fas fa-filter text-primary"></i>
+                        </div>
+                        <h6 class="fw-semibold">Filterable</h6>
+                        <small class="text-muted">Advanced filtering options</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tips -->
+            <div class="alert alert-info mt-4" role="alert">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Tip:</strong> Leave filters empty to fetch all available data. You can apply additional filters after logging in.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Font Awesome for icons (if not already included) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<style>
+    .card {
+        border: none;
+        border-radius: 15px;
+    }
+    .card-header {
+        border-radius: 15px 15px 0 0 !important;
+    }
+    .form-control, .form-select {
+        border-radius: 10px;
+    }
+    .btn {
+        border-radius: 10px;
+    }
+    .display-4 {
+        font-weight: 300;
+    }
+</style>
+{% endblock %}
