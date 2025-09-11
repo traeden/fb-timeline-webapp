@@ -1,123 +1,139 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Sep  3 14:57:58 2025
-
-@author: traedennord
-"""
-
 {% extends "bootstrap/base.html" %}
-{% block title %}My Facebook Timeline{% endblock %}
+{% block title %}Timeline{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
-    <h1 class="mb-4">My Facebook Timeline</h1>
-    <p class="lead">User: {{ user_data.name }}</p>
+    <h1 class="mb-4">Your Facebook Timeline</h1>
+    
+    <!-- Filter Form -->
+    <div class="card mb-2">
+        <div class="card-body">
+            <h5 class="card-title">Filter Posts</h5>
+            <form method="GET" action="{{ url_for('timeline') }}" class="row g-3">
+                <!-- Preserve API filters as hidden inputs -->
+                {% if request.args.get('api_start_date') %}
+                    <input type="hidden" name="api_start_date" value="{{ request.args.get('api_start_date') }}">
+                {% endif %}
+                {% if request.args.get('api_end_date') %}
+                    <input type="hidden" name="api_end_date" value="{{ request.args.get('api_end_date') }}">
+                {% endif %}
+                {% if request.args.get('api_post_type') %}
+                    <input type="hidden" name="api_post_type" value="{{ request.args.get('api_post_type') }}">
+                {% endif %}
+                
+                <div class="col-md-3">
+                    <label for="display_start_date" class="form-label">Start Date:</label>
+                    <input type="date" id="display_start_date" name="display_start_date" class="form-control" value="{{ request.args.get('display_start_date') }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="display_end_date" class="form-label">End Date:</label>
+                    <input type="date" id="display_end_date" name="display_end_date" class="form-control" value="{{ request.args.get('display_end_date') }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="keyword" class="form-label">Keyword:</label>
+                    <input type="text" id="keyword" name="keyword" class="form-control" value="{{ request.args.get('keyword', '') }}" placeholder="Search in posts...">
+                </div>
+                <div class="col-md-3">
+                    <label for="has_photo" class="form-label">Has Photo:</label>
+                    <select id="has_photo" name="has_photo" class="form-control">
+                        <option value="">Any</option>
+                        <option value="yes" {% if request.args.get('has_photo') == 'yes' %}selected{% endif %}>Yes</option>
+                        <option value="no" {% if request.args.get('has_photo') == 'no' %}selected{% endif %}>No</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="has_video" class="form-label">Has Video:</label>
+                    <select id="has_video" name="has_video" class="form-control">
+                        <option value="">Any</option>
+                        <option value="yes" {% if request.args.get('has_video') == 'yes' %}selected{% endif %}>Yes</option>
+                        <option value="no" {% if request.args.get('has_video') == 'no' %}selected{% endif %}>No</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="min_length" class="form-label">Min Length:</label>
+                    <input type="number" id="min_length" name="min_length" class="form-control" value="{{ request.args.get('min_length') }}" placeholder="Characters">
+                </div>
+                <div class="col-md-3">
+                    <label for="max_length" class="form-label">Max Length:</label>
+                    <input type="number" id="max_length" name="max_length" class="form-control" value="{{ request.args.get('max_length') }}" placeholder="Characters">
+                </div>
+                <div class="col-md-3">
+                    <label for="has_tags" class="form-label">Has Tags (@):</label>
+                    <select id="has_tags" name="has_tags" class="form-control">
+                        <option value="">Any</option>
+                        <option value="yes" {% if request.args.get('has_tags') == 'yes' %}selected{% endif %}>Yes</option>
+                        <option value="no" {% if request.args.get('has_tags') == 'no' %}selected{% endif %}>No</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mt-5 pt-2">
+                    <button type="submit" class="btn btn-primary me-2">Apply Filters</button>
+                    <a href="{{ url_for('timeline') }}?clear_filters=true{% if request.args.get('api_start_date') %}&api_start_date={{ request.args.get('api_start_date') }}{% endif %}{% if request.args.get('api_end_date') %}&api_end_date={{ request.args.get('api_end_date') }}{% endif %}{% if request.args.get('api_post_type') %}&api_post_type={{ request.args.get('api_post_type') }}{% endif %}" class="btn btn-secondary">Clear Filters</a>
+                </div>
+            </form>
+        </div>
+    </div>
 
-<!-- Filter Form -->
-<form method="GET" class="mb-4">
-    <div class="row g-3">
-        <div class="col-md-3">
-            <label for="start_date" class="form-label">Start Date:</label>
-            <input type="date" id="start_date" name="start_date" class="form-control">
-        </div>
-        <div class="col-md-3">
-            <label for="end_date" class="form-label">End Date:</label>
-            <input type="date" id="end_date" name="end_date" class="form-control">
-        </div>
-        <div class="col-md-3">
-            <label for="keyword" class="form-label">Keyword Search:</label>
-            <input type="text" id="keyword" name="keyword" class="form-control" placeholder="Enter keyword">
-        </div>
-        <div class="col-md-3">
-            <label>&nbsp;</label> <!-- Spacer -->
-        </div>
+    <!-- Applied Filters Section -->
+    <div class="mb-4">
+        <small class="text-muted">
+            <strong>API Filters:</strong> 
+            {% if request.args.get('api_start_date') %}Start: {{ request.args.get('api_start_date') }}{% endif %}
+            {% if request.args.get('api_end_date') %} | End: {{ request.args.get('api_end_date') }}{% endif %}
+            {% if request.args.get('api_post_type') %} | Type: {{ request.args.get('api_post_type')|capitalize }}{% endif %}
+            {% if not request.args.get('api_start_date') and not request.args.get('api_end_date') and not request.args.get('api_post_type') %}None{% endif %}
+            <br>
+            <strong>Display Filters:</strong> 
+            {% if request.args.get('display_start_date') %}Start: {{ request.args.get('display_start_date') }}{% endif %}
+            {% if request.args.get('display_end_date') %} | End: {{ request.args.get('display_end_date') }}{% endif %}
+            {% if request.args.get('keyword') %} | Keyword: "{{ request.args.get('keyword') }}"{% endif %}
+            {% if request.args.get('has_photo') %} | Photo: {{ request.args.get('has_photo')|capitalize }}{% endif %}
+            {% if request.args.get('has_video') %} | Video: {{ request.args.get('has_video')|capitalize }}{% endif %}
+            {% if request.args.get('min_length') %} | Min: {{ request.args.get('min_length') }}{% endif %}
+            {% if request.args.get('max_length') %} | Max: {{ request.args.get('max_length') }}{% endif %}
+            {% if request.args.get('has_tags') %} | Tags: {{ request.args.get('has_tags')|capitalize }}{% endif %}
+            {% if not request.args.get('display_start_date') and not request.args.get('display_end_date') and not request.args.get('keyword') and not request.args.get('has_photo') and not request.args.get('has_video') and not request.args.get('min_length') and not request.args.get('max_length') and not request.args.get('has_tags') %}None{% endif %}
+        </small>
     </div>
-    <div class="row g-3 mt-3">
-        <div class="col-md-2">
-            <label class="form-label">Has Photo:</label>
-            <select name="has_photo" class="form-control">
-                <option value="">Any</option>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Has Video:</label>
-            <select name="has_video" class="form-control">
-                <option value="">Any</option>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Min Length:</label>
-            <input type="number" name="min_length" class="form-control" placeholder="0" min="0">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Max Length:</label>
-            <input type="number" name="max_length" class="form-control" placeholder="Max">
-        </div>
-        <div class="col-md-4">
-            <label class="form-label">Tagged (People/Places):</label>
-            <select name="has_tags" class="form-control">
-                <option value="">Any</option>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-            </select>
-        </div>
-    </div>
-    <div class="row mt-3">
-        <div class="col-md-6">
-            <button type="submit" class="btn btn-primary w-100">Apply Filters</button>
-        </div>
-        <div class="col-md-6">
-            <a href="{{ url_for('timeline', clear_filters='true') }}" class="btn btn-secondary w-100">Clear Filters</a>
-        </div>
-    </div>
-    <!-- Filter Summary Bar -->
-    {% if request.args %}
-    <div class="mt-3 p-2 bg-light text-muted small" style="border-radius: 5px;">
-        Applied Filters:
-        {% if request.args.get('start_date') %} Start Date: {{ request.args.get('start_date') }}{% endif %}
-        {% if request.args.get('end_date') %} | End Date: {{ request.args.get('end_date') }}{% endif %}
-        {% if request.args.get('keyword') %} | Keyword: {{ request.args.get('keyword') }}{% endif %}
-        {% if request.args.get('has_photo') and request.args.get('has_photo') != '' %} | Has Photo: {{ request.args.get('has_photo') }}{% endif %}
-        {% if request.args.get('has_video') and request.args.get('has_video') != '' %} | Has Video: {{ request.args.get('has_video') }}{% endif %}
-        {% if request.args.get('min_length') %} | Min Length: {{ request.args.get('min_length') }}{% endif %}
-        {% if request.args.get('max_length') %} | Max Length: {{ request.args.get('max_length') }}{% endif %}
-        {% if request.args.get('has_tags') and request.args.get('has_tags') != '' %} | Tagged: {{ request.args.get('has_tags') }}{% endif %}
-    </div>
-    {% endif %}
-</form>
 
-    <!-- Post Display -->
-    {% if posts %}
-        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-            {% for post in posts %}
-                <div class="col">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title">Post ID: {{ post.facebook_id }}</h5>
-                            <p class="card-text"><strong>Message:</strong> {{ post.message or 'No message' }}</p>
-                            <p class="card-text"><strong>Created:</strong> {{ post.created_time }}</p>
+    <!-- Posts Count -->
+    <div class="mb-3">
+        <strong>{{ posts|length }} posts found</strong>
+    </div>
+
+    <!-- Posts Display -->
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Posts</h5>
+            {% if posts %}
+                <ul class="list-group">
+                    {% for post in posts %}
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <strong>{{ user_data.name }}</strong>
+                                    <small class="text-muted"> - {{ post.created_time }}</small>
+                                </div>
+                                <small class="text-muted">ID: {{ post.facebook_id }}</small>
+                            </div>
+                            {% if post.message %}
+                                <p class="mt-2">{{ post.message|safe }}</p>
+                            {% endif %}
                             {% if post.photo_url %}
-                                <img src="{{ post.photo_url }}" class="card-img-top" alt="Post Photo" style="max-height: 200px; object-fit: cover;">
+                                <img src="{{ post.photo_url }}" alt="Photo" class="img-fluid mt-2" style="max-width: 300px;">
                             {% endif %}
                             {% if post.video_url %}
-                                <video controls class="card-video w-100" style="max-height: 200px;">
+                                <video controls class="mt-2" style="max-width: 300px;">
                                     <source src="{{ post.video_url }}" type="video/mp4">
+                                    Your browser does not support the video tag.
                                 </video>
                             {% endif %}
-                        </div>
-                    </div>
-                </div>
-            {% endfor %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No posts found matching your criteria.</p>
+            {% endif %}
         </div>
-    {% else %}
-        <p class="text-muted">No posts available</p>
-    {% endif %}
-
-    <a href="{{ url_for('home') }}" class="btn btn-primary mt-4">Back to Home</a>
+    </div>
 </div>
 {% endblock %}
