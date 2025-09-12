@@ -100,40 +100,161 @@
         <strong>{{ posts|length }} posts found</strong>
     </div>
 
-    <!-- Posts Display -->
-    <div class="card">
-        <div class="card-body">
-            <h5 class="card-title">Posts</h5>
-            {% if posts %}
-                <ul class="list-group">
-                    {% for post in posts %}
-                        <li class="list-group-item">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div class="flex-grow-1">
-                                    <strong>{{ user_data.name }}</strong>
-                                    <small class="text-muted"> - {{ post.created_time }}</small>
-                                </div>
-                                <small class="text-muted">ID: {{ post.facebook_id }}</small>
+<!-- Enhanced post display section for timeline.html -->
+<!-- Replace the existing post display section with this -->
+
+{% if posts %}
+    <div class="row">
+        {% for post in posts %}
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <!-- Post Header -->
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <h6 class="card-title mb-0">{{ user_data.name }}</h6>
+                                <small class="text-muted">{{ post.created_time }}</small>
                             </div>
-                            {% if post.message %}
-                                <p class="mt-2">{{ post.message|safe }}</p>
-                            {% endif %}
+                            <small class="text-muted">ID: {{ post.facebook_id }}</small>
+                        </div>
+
+                        <!-- Post Message -->
+                        {% if post.message %}
+                            <p class="card-text">{{ post.message|safe }}</p>
+                        {% endif %}
+
+                        <!-- Multiple Photos -->
+                        {% if post.photos %}
+                            <div class="mb-3">
+                                {% if post.photos|length == 1 %}
+                                    <!-- Single photo -->
+                                    <img src="{{ post.photos[0].src }}" alt="Photo" class="img-fluid rounded" style="max-width: 100%; max-height: 400px;">
+                                {% elif post.photos|length <= 4 %}
+                                    <!-- Photo grid for 2-4 photos -->
+                                    <div class="row g-2">
+                                        {% for photo in post.photos %}
+                                            <div class="col-6">
+                                                <img src="{{ photo.src }}" alt="Photo {{ loop.index }}" 
+                                                     class="img-fluid rounded w-100" style="height: 200px; object-fit: cover;">
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <!-- Carousel for 5+ photos -->
+                                    <div id="carousel-{{ post.facebook_id }}" class="carousel slide" data-bs-ride="carousel">
+                                        <div class="carousel-inner">
+                                            {% for photo in post.photos %}
+                                                <div class="carousel-item {% if loop.first %}active{% endif %}">
+                                                    <img src="{{ photo.src }}" class="d-block w-100 rounded" 
+                                                         style="height: 400px; object-fit: cover;" alt="Photo {{ loop.index }}">
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                        <button class="carousel-control-prev" type="button" data-bs-target="#carousel-{{ post.facebook_id }}" data-bs-slide="prev">
+                                            <span class="carousel-control-prev-icon"></span>
+                                        </button>
+                                        <button class="carousel-control-next" type="button" data-bs-target="#carousel-{{ post.facebook_id }}" data-bs-slide="next">
+                                            <span class="carousel-control-next-icon"></span>
+                                        </button>
+                                        <div class="carousel-indicators">
+                                            {% for photo in post.photos %}
+                                                <button type="button" data-bs-target="#carousel-{{ post.facebook_id }}" 
+                                                        data-bs-slide-to="{{ loop.index0 }}" 
+                                                        {% if loop.first %}class="active"{% endif %}></button>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">{{ post.photos|length }} photos</small>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+
+                        <!-- Videos -->
+                        {% if post.videos %}
+                            <div class="mb-3">
+                                {% for video in post.videos %}
+                                    <div class="mb-2">
+                                        {% if video.title %}
+                                            <h6>{{ video.title }}</h6>
+                                        {% endif %}
+                                        {% if video.src %}
+                                            <video controls class="w-100 rounded" style="max-height: 400px;">
+                                                <source src="{{ video.src }}" type="video/mp4">
+                                                Your browser does not support the video tag.
+                                            </video>
+                                        {% elif video.url %}
+                                            <a href="{{ video.url }}" target="_blank" class="btn btn-outline-primary">
+                                                <i class="fas fa-play"></i> Watch Video
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <!-- Shared Links -->
+                        {% if post.links %}
+                            <div class="mb-3">
+                                {% for link in post.links %}
+                                    <div class="card bg-light mb-2">
+                                        <div class="row g-0">
+                                            {% if link.thumbnail %}
+                                                <div class="col-md-4">
+                                                    <img src="{{ link.thumbnail }}" class="img-fluid rounded-start h-100" 
+                                                         style="object-fit: cover;" alt="Link preview">
+                                                </div>
+                                                <div class="col-md-8">
+                                            {% else %}
+                                                <div class="col-12">
+                                            {% endif %}
+                                                <div class="card-body">
+                                                    {% if link.title %}
+                                                        <h6 class="card-title">{{ link.title }}</h6>
+                                                    {% endif %}
+                                                    {% if link.description %}
+                                                        <p class="card-text">{{ link.description }}</p>
+                                                    {% endif %}
+                                                    {% if link.domain %}
+                                                        <small class="text-muted">{{ link.domain }}</small>
+                                                    {% endif %}
+                                                    {% if link.url %}
+                                                        <div class="mt-2">
+                                                            <a href="{{ link.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                                <i class="fas fa-external-link-alt"></i> Visit Link
+                                                            </a>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <!-- Fallback for backward compatibility -->
+                        {% if not post.photos and not post.videos and not post.links %}
                             {% if post.photo_url %}
-                                <img src="{{ post.photo_url }}" alt="Photo" class="img-fluid mt-2" style="max-width: 300px;">
+                                <img src="{{ post.photo_url }}" alt="Photo" class="img-fluid mt-2 rounded" style="max-width: 300px;">
                             {% endif %}
                             {% if post.video_url %}
-                                <video controls class="mt-2" style="max-width: 300px;">
+                                <video controls class="mt-2 rounded" style="max-width: 300px;">
                                     <source src="{{ post.video_url }}" type="video/mp4">
                                     Your browser does not support the video tag.
                                 </video>
                             {% endif %}
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p>No posts found matching your criteria.</p>
-            {% endif %}
-        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
     </div>
+{% else %}
+    <div class="text-center py-5">
+        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+        <h5>No posts found</h5>
+        <p class="text-muted">No posts match your current filter criteria.</p>
+    </div>
+{% endif %}
 </div>
 {% endblock %}
