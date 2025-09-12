@@ -50,6 +50,14 @@
                     </select>
                 </div>
                 <div class="col-md-3">
+                    <label for="has_links" class="form-label">Has Links:</label>
+                    <select id="has_links" name="has_links" class="form-control">
+                        <option value="">Any</option>
+                        <option value="yes" {% if request.args.get('has_links') == 'yes' %}selected{% endif %}>Yes</option>
+                        <option value="no" {% if request.args.get('has_links') == 'no' %}selected{% endif %}>No</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
                     <label for="min_length" class="form-label">Min Length:</label>
                     <input type="number" id="min_length" name="min_length" class="form-control" value="{{ request.args.get('min_length') }}" placeholder="Characters">
                 </div>
@@ -88,10 +96,11 @@
             {% if request.args.get('keyword') %} | Keyword: "{{ request.args.get('keyword') }}"{% endif %}
             {% if request.args.get('has_photo') %} | Photo: {{ request.args.get('has_photo')|capitalize }}{% endif %}
             {% if request.args.get('has_video') %} | Video: {{ request.args.get('has_video')|capitalize }}{% endif %}
+            {% if request.args.get('has_links') %} | Links: {{ request.args.get('has_links')|capitalize }}{% endif %}
             {% if request.args.get('min_length') %} | Min: {{ request.args.get('min_length') }}{% endif %}
             {% if request.args.get('max_length') %} | Max: {{ request.args.get('max_length') }}{% endif %}
             {% if request.args.get('has_tags') %} | Tags: {{ request.args.get('has_tags')|capitalize }}{% endif %}
-            {% if not request.args.get('display_start_date') and not request.args.get('display_end_date') and not request.args.get('keyword') and not request.args.get('has_photo') and not request.args.get('has_video') and not request.args.get('min_length') and not request.args.get('max_length') and not request.args.get('has_tags') %}None{% endif %}
+            {% if not request.args.get('display_start_date') and not request.args.get('display_end_date') and not request.args.get('keyword') and not request.args.get('has_photo') and not request.args.get('has_video') and not request.args.get('has_links') and not request.args.get('min_length') and not request.args.get('max_length') and not request.args.get('has_tags') %}None{% endif %}
         </small>
     </div>
 
@@ -99,9 +108,6 @@
     <div class="mb-3">
         <strong>{{ posts|length }} posts found</strong>
     </div>
-
-<!-- Enhanced post display section for timeline.html -->
-<!-- Replace the existing post display section with this -->
 
 {% if posts %}
     <div class="row">
@@ -232,17 +238,16 @@
                             </div>
                         {% endif %}
 
-                        <!-- Fallback for backward compatibility -->
-                        {% if not post.photos and not post.videos and not post.links %}
-                            {% if post.photo_url %}
-                                <img src="{{ post.photo_url }}" alt="Photo" class="img-fluid mt-2 rounded" style="max-width: 300px;">
-                            {% endif %}
-                            {% if post.video_url %}
-                                <video controls class="mt-2 rounded" style="max-width: 300px;">
-                                    <source src="{{ post.video_url }}" type="video/mp4">
-                                    Your browser does not support the video tag.
-                                </video>
-                            {% endif %}
+                        <!-- Debug info for troubleshooting -->
+                        {% if request.args.get('debug') == 'true' %}
+                            <div class="alert alert-info mt-2">
+                                <small>
+                                    <strong>Debug Info:</strong><br>
+                                    Photos: {{ post.photos|length if post.photos else 0 }}<br>
+                                    Videos: {{ post.videos|length if post.videos else 0 }}<br>
+                                    Links: {{ post.links|length if post.links else 0 }}
+                                </small>
+                            </div>
                         {% endif %}
                     </div>
                 </div>
@@ -254,7 +259,13 @@
         <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
         <h5>No posts found</h5>
         <p class="text-muted">No posts match your current filter criteria.</p>
+        {% if request.args.get('debug') != 'true' %}
+            <a href="{{ request.url }}&debug=true" class="btn btn-sm btn-outline-secondary">Show Debug Info</a>
+        {% endif %}
     </div>
 {% endif %}
 </div>
+
+<!-- Add Font Awesome for icons (if not already included) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 {% endblock %}
