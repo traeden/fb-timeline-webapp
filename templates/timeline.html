@@ -475,13 +475,13 @@
 /* Grid Layouts */
 .media-grid {
     display: grid;
-    gap: 8px;
     border-radius: 12px;
     overflow: hidden;
 }
 
 .media-grid-2 {
     grid-template-columns: 1fr 1fr;
+    gap: 4px;
     max-height: 400px;
 }
 
@@ -489,40 +489,54 @@
     aspect-ratio: 1;
 }
 
+/* FIXED: 3-item layout to match Facebook */
 .media-grid-3 {
-    grid-template-columns: 2fr 1fr;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 4px;
     max-height: 400px;
-    gap: 8px;
+    max-width: 600px;
+    margin: 0 auto;
 }
 
 .media-grid-3 .media-large {
     grid-row: 1 / 3;
-    aspect-ratio: 4/5;
+    grid-column: 1;
 }
 
 .media-grid-3 .media-small-container {
+    grid-column: 2;
+    grid-row: 1 / 3;
     display: grid;
     grid-template-rows: 1fr 1fr;
-    gap: 8px;
+    gap: 4px;
 }
 
 .media-grid-3 .media-small {
-    aspect-ratio: 1;
+    /* No need for aspect-ratio here as it's controlled by the container */
 }
 
-/* Improved 2x2 Grid for exactly 4 items */
+/* FIXED: 4-item Grid with proper spacing */
 .media-grid-4 {
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
+    gap: 4px; /* This is the key fix - adds white space between items */
     max-height: 500px;
     max-width: 600px;
     margin: 0 auto;
-    gap: 8px;
 }
 
 .media-grid-4 .media-item {
     aspect-ratio: 1;
     min-height: 200px;
+    /* Ensure no overlap with clean positioning */
+    position: relative;
+    z-index: 1;
+    /* Ensure items don't have any margin/padding that could cause overlap */
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
 /* Ensure proper aspect ratio preservation */
@@ -566,6 +580,7 @@
     font-size: 20px;
     transition: background 0.2s ease;
     pointer-events: none;
+    z-index: 2; /* Ensure play button is above video */
 }
 
 .video-play-overlay:hover {
@@ -587,6 +602,17 @@
     font-size: 2rem;
     font-weight: bold;
     border-radius: 12px;
+    z-index: 3; /* Ensure overlay is on top */
+}
+
+/* FIXED: Video controls accessibility */
+.media-item video {
+    position: relative;
+    z-index: 2; /* Ensure video controls are accessible */
+}
+
+.media-item video::-webkit-media-controls {
+    z-index: 3; /* Ensure native controls are on top */
 }
 
 /* Expand Button */
@@ -677,22 +703,10 @@
 /* Responsive Design */
 @media (max-width: 768px) {
     .media-grid-3 {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto auto;
-    }
-    
-    .media-grid-3 .media-large {
-        grid-row: 1;
-        aspect-ratio: 16/10;
-    }
-    
-    .media-grid-3 .media-small-container {
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: 1fr;
+        max-height: 300px;
     }
     
     .media-grid-4 {
-        grid-template-columns: 1fr 1fr;
         max-height: 300px;
     }
     
