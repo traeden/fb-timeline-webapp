@@ -3,7 +3,12 @@
 
 {% block content %}
 <div class="container mt-5">
-    <h1 class="mb-4">Your Facebook Timeline</h1>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">Your Facebook Timeline</h1>
+        <a href="{{ url_for('home') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+    </div>
     
     <!-- Filter Form -->
     <div class="card mb-2">
@@ -73,9 +78,11 @@
                         <option value="no" {% if request.args.get('has_tags') == 'no' %}selected{% endif %}>No</option>
                     </select>
                 </div>
-                <div class="col-md-3 mt-5 pt-2">
-                    <button type="submit" class="btn btn-primary me-2">Apply Filters</button>
-                    <a href="{{ url_for('timeline') }}?clear_filters=true{% if request.args.get('api_start_date') %}&api_start_date={{ request.args.get('api_start_date') }}{% endif %}{% if request.args.get('api_end_date') %}&api_end_date={{ request.args.get('api_end_date') }}{% endif %}{% if request.args.get('api_post_type') %}&api_post_type={{ request.args.get('api_post_type') }}{% endif %}" class="btn btn-secondary">Clear Filters</a>
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="d-flex gap-2 w-100">
+                        <button type="submit" class="btn btn-primary flex-fill">Apply Filters</button>
+                        <a href="{{ url_for('timeline') }}?clear_filters=true{% if request.args.get('api_start_date') %}&api_start_date={{ request.args.get('api_start_date') }}{% endif %}{% if request.args.get('api_end_date') %}&api_end_date={{ request.args.get('api_end_date') }}{% endif %}{% if request.args.get('api_post_type') %}&api_post_type={{ request.args.get('api_post_type') }}{% endif %}" class="btn btn-secondary flex-fill">Clear Filters</a>
+                    </div>
                 </div>
             </form>
         </div>
@@ -129,73 +136,214 @@
                             <p class="card-text">{{ post.message|safe }}</p>
                         {% endif %}
 
-                        <!-- Multiple Photos -->
-                        {% if post.photos %}
-                            <div class="mb-3">
-                                {% if post.photos|length == 1 %}
-                                    <!-- Single photo -->
-                                    <img src="{{ post.photos[0].src }}" alt="Photo" class="img-fluid rounded" style="max-width: 100%; max-height: 400px;">
-                                {% elif post.photos|length <= 4 %}
-                                    <!-- Photo grid for 2-4 photos -->
-                                    <div class="row g-2">
-                                        {% for photo in post.photos %}
-                                            <div class="col-6">
-                                                <img src="{{ photo.src }}" alt="Photo {{ loop.index }}" 
-                                                     class="img-fluid rounded w-100" style="height: 200px; object-fit: cover;">
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <!-- Carousel for 5+ photos -->
-                                    <div id="carousel-{{ post.facebook_id }}" class="carousel slide" data-bs-ride="carousel">
-                                        <div class="carousel-inner">
-                                            {% for photo in post.photos %}
-                                                <div class="carousel-item {% if loop.first %}active{% endif %}">
-                                                    <img src="{{ photo.src }}" class="d-block w-100 rounded" 
-                                                         style="height: 400px; object-fit: cover;" alt="Photo {{ loop.index }}">
-                                                </div>
-                                            {% endfor %}
-                                        </div>
-                                        <button class="carousel-control-prev" type="button" data-bs-target="#carousel-{{ post.facebook_id }}" data-bs-slide="prev">
-                                            <span class="carousel-control-prev-icon"></span>
-                                        </button>
-                                        <button class="carousel-control-next" type="button" data-bs-target="#carousel-{{ post.facebook_id }}" data-bs-slide="next">
-                                            <span class="carousel-control-next-icon"></span>
-                                        </button>
-                                        <div class="carousel-indicators">
-                                            {% for photo in post.photos %}
-                                                <button type="button" data-bs-target="#carousel-{{ post.facebook_id }}" 
-                                                        data-bs-slide-to="{{ loop.index0 }}" 
-                                                        {% if loop.first %}class="active"{% endif %}></button>
-                                            {% endfor %}
-                                        </div>
-                                    </div>
-                                    <small class="text-muted">{{ post.photos|length }} photos</small>
-                                {% endif %}
-                            </div>
-                        {% endif %}
-
-                        <!-- Videos -->
-                        {% if post.videos %}
-                            <div class="mb-3">
-                                {% for video in post.videos %}
-                                    <div class="mb-2">
-                                        {% if video.title %}
-                                            <h6>{{ video.title }}</h6>
-                                        {% endif %}
-                                        {% if video.src %}
-                                            <video controls class="w-100 rounded" style="max-height: 400px;">
-                                                <source src="{{ video.src }}" type="video/mp4">
-                                                Your browser does not support the video tag.
-                                            </video>
-                                        {% elif video.url %}
-                                            <a href="{{ video.url }}" target="_blank" class="btn btn-outline-primary">
-                                                <i class="fas fa-play"></i> Watch Video
-                                            </a>
-                                        {% endif %}
-                                    </div>
+                        <!-- Media Gallery -->
+                        {% if post.photos or post.videos %}
+                            {% set combined_media = [] %}
+                            {% if post.photos %}
+                                {% for photo in post.photos %}
+                                    {% set _ = combined_media.append({
+                                        'type': 'photo',
+                                        'src': photo.src,
+                                        'alt': 'Photo ' ~ loop.index
+                                    }) %}
                                 {% endfor %}
-                            </div>
+                            {% endif %}
+                            {% if post.videos %}
+                                {% for video in post.videos %}
+                                    {% set _ = combined_media.append({
+                                        'type': 'video',
+                                        'src': video.src if video.src else None,
+                                        'thumbnail': video.thumbnail if video.thumbnail else None,
+                                        'url': video.url if video.url else None,
+                                        'title': video.title if video.title else None,
+                                        'alt': 'Video ' ~ loop.index
+                                    }) %}
+                                {% endfor %}
+                            {% endif %}
+                            {% set total_media = combined_media|length %}
+                            
+                            {% if total_media > 0 %}
+                                <div class="media-gallery mb-3" 
+                                     data-media-count="{{ total_media }}" 
+                                     data-post-id="{{ post.facebook_id }}"
+                                     data-media-list="{{ combined_media | tojson | safe }}">
+                                    
+                                    <!-- Visible Media Container -->
+                                    <div class="visible-media-container" data-expanded="false">
+                                        {% if total_media == 1 %}
+                                            <!-- Single media item -->
+                                            <div class="media-single">
+                                                <div class="media-item" data-media-index="0" data-media-type="{{ combined_media[0].type }}">
+                                                    {% if combined_media[0].type == 'photo' %}
+                                                        <img src="{{ combined_media[0].src }}" alt="{{ combined_media[0].alt }}" 
+                                                             class="media-content" loading="lazy">
+                                                    {% else %}
+                                                        {% if combined_media[0].src %}
+                                                            <video class="media-content" poster="{{ combined_media[0].thumbnail }}" controls preload="metadata">
+                                                                <source src="{{ combined_media[0].src }}" type="video/mp4">
+                                                            </video>
+                                                        {% elif combined_media[0].thumbnail %}
+                                                            <div class="video-thumbnail-container">
+                                                                <img src="{{ combined_media[0].thumbnail }}" alt="{{ combined_media[0].alt }}" 
+                                                                     class="media-content" loading="lazy">
+                                                                <div class="video-play-overlay">
+                                                                    <i class="fas fa-play"></i>
+                                                                </div>
+                                                            </div>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            
+                                        {% elif total_media == 2 %}
+                                            <!-- Two media items -->
+                                            <div class="media-grid media-grid-2">
+                                                {% for media in combined_media %}
+                                                    <div class="media-item" data-media-index="{{ loop.index0 }}" data-media-type="{{ media.type }}">
+                                                        {% if media.type == 'photo' %}
+                                                            <img src="{{ media.src }}" alt="{{ media.alt }}" 
+                                                                 class="media-content" loading="lazy">
+                                                        {% else %}
+                                                            {% if media.src %}
+                                                                <video class="media-content" poster="{{ media.thumbnail }}" controls preload="metadata">
+                                                                    <source src="{{ media.src }}" type="video/mp4">
+                                                                </video>
+                                                            {% elif media.thumbnail %}
+                                                                <div class="video-thumbnail-container">
+                                                                    <img src="{{ media.thumbnail }}" alt="{{ media.alt }}" 
+                                                                         class="media-content" loading="lazy">
+                                                                    <div class="video-play-overlay">
+                                                                        <i class="fas fa-play"></i>
+                                                                    </div>
+                                                                </div>
+                                                            {% endif %}
+                                                        {% endif %}
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                            
+                                        {% elif total_media == 3 %}
+                                            <!-- Three media items -->
+                                            <div class="media-grid media-grid-3">
+                                                <div class="media-item media-large" data-media-index="0" data-media-type="{{ combined_media[0].type }}">
+                                                    {% if combined_media[0].type == 'photo' %}
+                                                        <img src="{{ combined_media[0].src }}" alt="{{ combined_media[0].alt }}" 
+                                                             class="media-content" loading="lazy">
+                                                    {% else %}
+                                                        {% if combined_media[0].src %}
+                                                            <video class="media-content" poster="{{ combined_media[0].thumbnail }}" controls preload="metadata">
+                                                                <source src="{{ combined_media[0].src }}" type="video/mp4">
+                                                            </video>
+                                                        {% elif combined_media[0].thumbnail %}
+                                                            <div class="video-thumbnail-container">
+                                                                <img src="{{ combined_media[0].thumbnail }}" alt="{{ combined_media[0].alt }}" 
+                                                                     class="media-content" loading="lazy">
+                                                                <div class="video-play-overlay">
+                                                                    <i class="fas fa-play"></i>
+                                                                </div>
+                                                            </div>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </div>
+                                                <div class="media-small-container">
+                                                    {% for media in combined_media[1:3] %}
+                                                        <div class="media-item media-small" data-media-index="{{ loop.index }}" data-media-type="{{ media.type }}">
+                                                            {% if media.type == 'photo' %}
+                                                                <img src="{{ media.src }}" alt="{{ media.alt }}" 
+                                                                     class="media-content" loading="lazy">
+                                                            {% else %}
+                                                                {% if media.src %}
+                                                                    <video class="media-content" poster="{{ media.thumbnail }}" controls preload="metadata">
+                                                                        <source src="{{ media.src }}" type="video/mp4">
+                                                                    </video>
+                                                                {% elif media.thumbnail %}
+                                                                    <div class="video-thumbnail-container">
+                                                                        <img src="{{ media.thumbnail }}" alt="{{ media.alt }}" 
+                                                                             class="media-content" loading="lazy">
+                                                                        <div class="video-play-overlay">
+                                                                            <i class="fas fa-play"></i>
+                                                                        </div>
+                                                                    </div>
+                                                                {% endif %}
+                                                            {% endif %}
+                                                        </div>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                            
+                                        {% else %}
+                                            <!-- 4+ media items -->
+                                            <div class="media-grid media-grid-4">
+                                                {% for media in combined_media[:4] %}
+                                                    <div class="media-item" data-media-index="{{ loop.index0 }}" data-media-type="{{ media.type }}">
+                                                        {% if media.type == 'photo' %}
+                                                            <img src="{{ media.src }}" alt="{{ media.alt }}" 
+                                                                 class="media-content" loading="lazy">
+                                                        {% else %}
+                                                            {% if media.src %}
+                                                                <video class="media-content" poster="{{ media.thumbnail }}" controls preload="metadata">
+                                                                    <source src="{{ media.src }}" type="video/mp4">
+                                                                </video>
+                                                            {% elif media.thumbnail %}
+                                                                <div class="video-thumbnail-container">
+                                                                    <img src="{{ media.thumbnail }}" alt="{{ media.alt }}" 
+                                                                         class="media-content" loading="lazy">
+                                                                    <div class="video-play-overlay">
+                                                                        <i class="fas fa-play"></i>
+                                                                    </div>
+                                                                </div>
+                                                            {% endif %}
+                                                        {% endif %}
+                                                        {% if loop.index == 4 and total_media > 4 %}
+                                                            <div class="more-overlay">
+                                                                <span>+{{ total_media - 4 }}</span>
+                                                            </div>
+                                                        {% endif %}
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Hidden Additional Media (for 5+ items) -->
+                                    {% if total_media > 4 %}
+                                        <div class="additional-media-container" style="display: none;">
+                                            <div class="additional-media-grid">
+                                                {% for media in combined_media[4:] %}
+                                                    <div class="media-item" data-media-index="{{ loop.index0 + 4 }}" data-media-type="{{ media.type }}">
+                                                        {% if media.type == 'photo' %}
+                                                            <img src="{{ media.src }}" alt="{{ media.alt }}" 
+                                                                 class="media-content" loading="lazy">
+                                                        {% else %}
+                                                            {% if media.src %}
+                                                                <video class="media-content" poster="{{ media.thumbnail }}" controls preload="metadata">
+                                                                    <source src="{{ media.src }}" type="video/mp4">
+                                                                </video>
+                                                            {% elif media.thumbnail %}
+                                                                <div class="video-thumbnail-container">
+                                                                    <img src="{{ media.thumbnail }}" alt="{{ media.alt }}" 
+                                                                         class="media-content" loading="lazy">
+                                                                    <div class="video-play-overlay">
+                                                                        <i class="fas fa-play"></i>
+                                                                    </div>
+                                                                </div>
+                                                            {% endif %}
+                                                        {% endif %}
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Show/Hide Toggle Button -->
+                                        <div class="text-center mt-3">
+                                            <button class="btn btn-outline-primary expand-media-btn" data-post-id="{{ post.facebook_id }}">
+                                                <span class="expand-text">Show {{ total_media - 4 }} more media</span>
+                                                <span class="collapse-text" style="display: none;">Show less</span>
+                                            </button>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
                         {% endif %}
 
                         <!-- Shared Links -->
@@ -207,7 +355,7 @@
                                             {% if link.thumbnail %}
                                                 <div class="col-md-4">
                                                     <img src="{{ link.thumbnail }}" class="img-fluid rounded-start h-100" 
-                                                         style="object-fit: cover;" alt="Link preview">
+                                                         style="object-fit: cover;" alt="Link preview" loading="lazy">
                                                 </div>
                                                 <div class="col-md-8">
                                             {% else %}
@@ -237,35 +385,679 @@
                                 {% endfor %}
                             </div>
                         {% endif %}
-
-                        <!-- Debug info for troubleshooting -->
-                        {% if request.args.get('debug') == 'true' %}
-                            <div class="alert alert-info mt-2">
-                                <small>
-                                    <strong>Debug Info:</strong><br>
-                                    Photos: {{ post.photos|length if post.photos else 0 }}<br>
-                                    Videos: {{ post.videos|length if post.videos else 0 }}<br>
-                                    Links: {{ post.links|length if post.links else 0 }}
-                                </small>
-                            </div>
-                        {% endif %}
                     </div>
                 </div>
             </div>
         {% endfor %}
     </div>
+
+    <!-- Media Lightbox Modal -->
+    <div class="modal fade" id="mediaModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content bg-dark">
+                <div class="modal-header border-0">
+                    <div class="media-counter text-white"></div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body d-flex align-items-center justify-content-center position-relative p-0">
+                    <button class="media-nav-btn prev-btn" onclick="previousMedia()" title="Previous">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button class="media-nav-btn next-btn" onclick="nextMedia()" title="Next">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <div id="modalMediaContainer" class="w-100 h-100 d-flex align-items-center justify-content-center"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 {% else %}
     <div class="text-center py-5">
         <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
         <h5>No posts found</h5>
         <p class="text-muted">No posts match your current filter criteria.</p>
-        {% if request.args.get('debug') != 'true' %}
-            <a href="{{ request.url }}&debug=true" class="btn btn-sm btn-outline-secondary">Show Debug Info</a>
-        {% endif %}
     </div>
 {% endif %}
 </div>
 
-<!-- Add Font Awesome for icons (if not already included) -->
+<!-- Add Font Awesome for icons -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<!-- CSS for Improved Media Gallery -->
+<style>
+/* Base Media Gallery Styles */
+.media-gallery {
+    margin-bottom: 1rem;
+}
+
+.media-item {
+    position: relative;
+    cursor: pointer;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f8f9fa;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.media-item:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.media-content {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: 12px;
+}
+
+/* Single Media Layout */
+.media-single {
+    display: flex;
+    justify-content: center;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.media-single .media-item {
+    width: 100%;
+    aspect-ratio: 16/10;
+    max-height: 400px;
+}
+
+.media-single .media-content {
+    object-fit: contain;
+    background: #000;
+}
+
+/* Grid Layouts */
+.media-grid {
+    display: grid;
+    gap: 8px;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.media-grid-2 {
+    grid-template-columns: 1fr 1fr;
+    max-height: 400px;
+}
+
+.media-grid-2 .media-item {
+    aspect-ratio: 1;
+}
+
+.media-grid-3 {
+    grid-template-columns: 2fr 1fr;
+    max-height: 400px;
+    gap: 8px;
+}
+
+.media-grid-3 .media-large {
+    grid-row: 1 / 3;
+    aspect-ratio: 4/5;
+}
+
+.media-grid-3 .media-small-container {
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    gap: 8px;
+}
+
+.media-grid-3 .media-small {
+    aspect-ratio: 1;
+}
+
+/* Improved 2x2 Grid for exactly 4 items */
+.media-grid-4 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    max-height: 500px;
+    max-width: 600px;
+    margin: 0 auto;
+    gap: 8px;
+}
+
+.media-grid-4 .media-item {
+    aspect-ratio: 1;
+    min-height: 200px;
+}
+
+/* Ensure proper aspect ratio preservation */
+.media-grid-4 .media-content {
+    object-fit: cover;
+    object-position: center;
+}
+
+/* Additional Media Grid (for 5+ items when expanded) */
+.additional-media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.additional-media-grid .media-item {
+    aspect-ratio: 4/3;
+}
+
+/* Video Specific Styles */
+.video-thumbnail-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.video-play-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    transition: background 0.2s ease;
+    pointer-events: none;
+}
+
+.video-play-overlay:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+/* More Items Overlay */
+.more-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2rem;
+    font-weight: bold;
+    border-radius: 12px;
+}
+
+/* Expand Button */
+.expand-media-btn {
+    border-radius: 25px;
+    padding: 10px 24px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.expand-media-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Enhanced Modal Styles */
+.modal-content {
+    background: #000 !important;
+}
+
+.modal-body {
+    min-height: 80vh;
+}
+
+/* Enhanced modal media container with proper aspect ratio handling */
+#modalMediaContainer img,
+#modalMediaContainer video {
+    max-width: 90vw;
+    max-height: 85vh;
+    object-fit: contain;
+    object-position: center;
+    border-radius: 8px;
+    background: #111;
+}
+
+/* Ensure images maintain their aspect ratio in modal */
+#modalMediaContainer img {
+    width: auto;
+    height: auto;
+}
+
+.media-counter {
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.media-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 1050;
+    color: #333;
+}
+
+.media-nav-btn:hover {
+    background: white;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.prev-btn {
+    left: 20px;
+}
+
+.next-btn {
+    right: 20px;
+}
+
+.media-nav-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .media-grid-3 {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+    }
+    
+    .media-grid-3 .media-large {
+        grid-row: 1;
+        aspect-ratio: 16/10;
+    }
+    
+    .media-grid-3 .media-small-container {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr;
+    }
+    
+    .media-grid-4 {
+        grid-template-columns: 1fr 1fr;
+        max-height: 300px;
+    }
+    
+    .additional-media-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+    
+    .media-nav-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+    
+    .prev-btn {
+        left: 10px;
+    }
+    
+    .next-btn {
+        right: 10px;
+    }
+}
+
+/* Animation for expanding content */
+.additional-media-container {
+    animation: fadeInDown 0.3s ease-out;
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+</style>
+
+<!-- Enhanced JavaScript for Media Gallery with Improved Image Handling -->
+<script>
+let currentMediaGallery = [];
+let currentMediaIndex = 0;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize expand/collapse functionality
+    initializeExpandButtons();
+    
+    // Initialize media item clicks
+    initializeMediaClicks();
+    
+    // Initialize keyboard navigation
+    initializeKeyboardNavigation();
+});
+
+function initializeExpandButtons() {
+    document.querySelectorAll('.expand-media-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const postId = this.dataset.postId;
+            const gallery = document.querySelector(`[data-post-id="${postId}"]`);
+            const visibleContainer = gallery.querySelector('.visible-media-container');
+            const additionalContainer = gallery.querySelector('.additional-media-container');
+            const expandText = this.querySelector('.expand-text');
+            const collapseText = this.querySelector('.collapse-text');
+            
+            const isExpanded = visibleContainer.dataset.expanded === 'true';
+            
+            if (!isExpanded) {
+                // Expand
+                additionalContainer.style.display = 'block';
+                visibleContainer.dataset.expanded = 'true';
+                expandText.style.display = 'none';
+                collapseText.style.display = 'inline';
+                
+                // Smooth scroll to new content
+                setTimeout(() => {
+                    additionalContainer.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'nearest' 
+                    });
+                }, 150);
+            } else {
+                // Collapse
+                additionalContainer.style.display = 'none';
+                visibleContainer.dataset.expanded = 'false';
+                expandText.style.display = 'inline';
+                collapseText.style.display = 'none';
+            }
+        });
+    });
+}
+
+function initializeMediaClicks() {
+    document.querySelectorAll('.media-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            // Don't open lightbox if clicking on video controls
+            if (e.target.closest('video') && !e.target.classList.contains('media-content')) {
+                return;
+            }
+            
+            // Don't open lightbox for more overlay clicks (handle separately)
+            if (e.target.closest('.more-overlay')) {
+                const gallery = this.closest('.media-gallery');
+                const expandBtn = gallery.querySelector('.expand-media-btn');
+                if (expandBtn) {
+                    expandBtn.click();
+                }
+                return;
+            }
+            
+            openLightboxForItem(this);
+        });
+    });
+    
+    // Handle video interactions specifically
+    document.querySelectorAll('.media-item video').forEach(video => {
+        video.addEventListener('click', function(e) {
+            e.stopPropagation();
+            // Allow native video controls
+        });
+        
+        // Pause other videos when one plays
+        video.addEventListener('play', function() {
+            document.querySelectorAll('video').forEach(otherVideo => {
+                if (otherVideo !== this && !otherVideo.paused) {
+                    otherVideo.pause();
+                }
+            });
+        });
+    });
+}
+
+function initializeKeyboardNavigation() {
+    document.addEventListener('keydown', function(e) {
+        const modal = document.getElementById('mediaModal');
+        if (modal && modal.classList.contains('show')) {
+            switch(e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    previousMedia();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    nextMedia();
+                    break;
+                case 'Escape':
+                    e.preventDefault();
+                    bootstrap.Modal.getInstance(modal).hide();
+                    break;
+            }
+        }
+    });
+}
+
+function openLightboxForItem(item) {
+    const gallery = item.closest('.media-gallery');
+    const postId = gallery.dataset.postId;
+    const clickedIndex = parseInt(item.dataset.mediaIndex);
+    
+    // Prepare media data from the gallery
+    const mediaListJson = gallery.dataset.mediaList;
+    if (mediaListJson) {
+        try {
+            currentMediaGallery = JSON.parse(mediaListJson);
+            currentMediaIndex = clickedIndex;
+            showLightboxModal();
+        } catch (e) {
+            console.error('Failed to parse media list:', e);
+        }
+    }
+}
+
+function showLightboxModal() {
+    updateLightboxContent();
+    const modalElement = document.getElementById('mediaModal');
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
+}
+
+function updateLightboxContent() {
+    if (currentMediaGallery.length === 0) return;
+    
+    const media = currentMediaGallery[currentMediaIndex];
+    const container = document.getElementById('modalMediaContainer');
+    const counter = document.querySelector('.media-counter');
+    const prevBtn = document.querySelector('.prev-btn');
+    const nextBtn = document.querySelector('.next-btn');
+    
+    // Clear previous content
+    container.innerHTML = '';
+    
+    // Create media element with enhanced aspect ratio handling
+    if (media.type === 'photo') {
+        const img = document.createElement('img');
+        img.src = media.src;
+        img.alt = media.alt || 'Photo';
+        
+        // Enhanced image loading with proper aspect ratio preservation
+        img.onload = function() {
+            const imgAspectRatio = this.naturalWidth / this.naturalHeight;
+            const viewportAspectRatio = window.innerWidth / window.innerHeight;
+            
+            // Determine optimal sizing to maintain aspect ratio
+            if (imgAspectRatio > viewportAspectRatio) {
+                // Wide image
+                this.style.maxWidth = '90vw';
+                this.style.maxHeight = 'none';
+                this.style.height = 'auto';
+            } else {
+                // Tall image
+                this.style.maxHeight = '85vh';
+                this.style.maxWidth = 'none';
+                this.style.width = 'auto';
+            }
+            
+            // Center the image
+            this.style.objectFit = 'contain';
+            this.style.objectPosition = 'center';
+        };
+        
+        img.onerror = () => {
+            container.innerHTML = '<div class="text-white text-center"><i class="fas fa-exclamation-triangle fa-3x mb-3"></i><p>Image failed to load</p></div>';
+        };
+        
+        // Apply initial styles
+        img.style.borderRadius = '8px';
+        img.style.background = '#111';
+        img.style.display = 'block';
+        img.style.margin = '0 auto';
+        
+        container.appendChild(img);
+        
+    } else if (media.type === 'video') {
+        if (media.src) {
+            const video = document.createElement('video');
+            video.controls = true;
+            video.autoplay = false;
+            video.style.maxWidth = '90vw';
+            video.style.maxHeight = '85vh';
+            video.style.objectFit = 'contain';
+            video.style.objectPosition = 'center';
+            video.style.borderRadius = '8px';
+            video.style.background = '#111';
+            video.preload = 'metadata';
+            video.style.display = 'block';
+            video.style.margin = '0 auto';
+            
+            if (media.thumbnail) {
+                video.poster = media.thumbnail;
+            }
+            
+            const source = document.createElement('source');
+            source.src = media.src;
+            source.type = 'video/mp4';
+            video.appendChild(source);
+            
+            video.onerror = () => {
+                container.innerHTML = '<div class="text-white text-center"><i class="fas fa-exclamation-triangle fa-3x mb-3"></i><p>Video failed to load</p></div>';
+            };
+            
+            container.appendChild(video);
+            
+        } else if (media.thumbnail) {
+            const img = document.createElement('img');
+            img.src = media.thumbnail;
+            img.alt = media.alt || 'Video thumbnail';
+            
+            // Same enhanced loading for video thumbnails
+            img.onload = function() {
+                const imgAspectRatio = this.naturalWidth / this.naturalHeight;
+                const viewportAspectRatio = window.innerWidth / window.innerHeight;
+                
+                if (imgAspectRatio > viewportAspectRatio) {
+                    this.style.maxWidth = '90vw';
+                    this.style.maxHeight = 'none';
+                    this.style.height = 'auto';
+                } else {
+                    this.style.maxHeight = '85vh';
+                    this.style.maxWidth = 'none';
+                    this.style.width = 'auto';
+                }
+                
+                this.style.objectFit = 'contain';
+                this.style.objectPosition = 'center';
+            };
+            
+            img.style.borderRadius = '8px';
+            img.style.background = '#111';
+            img.style.display = 'block';
+            img.style.margin = '0 auto';
+            
+            // Add play overlay
+            const overlay = document.createElement('div');
+            overlay.style.position = 'absolute';
+            overlay.style.top = '50%';
+            overlay.style.left = '50%';
+            overlay.style.transform = 'translate(-50%, -50%)';
+            overlay.style.background = 'rgba(0, 0, 0, 0.7)';
+            overlay.style.color = 'white';
+            overlay.style.width = '80px';
+            overlay.style.height = '80px';
+            overlay.style.borderRadius = '50%';
+            overlay.style.display = 'flex';
+            overlay.style.alignItems = 'center';
+            overlay.style.justifyContent = 'center';
+            overlay.style.fontSize = '2rem';
+            overlay.innerHTML = '<i class="fas fa-play"></i>';
+            
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'relative';
+            wrapper.style.display = 'inline-block';
+            wrapper.appendChild(img);
+            wrapper.appendChild(overlay);
+            
+            container.appendChild(wrapper);
+        } else {
+            container.innerHTML = '<div class="text-white text-center"><i class="fas fa-video fa-3x mb-3"></i><p>Video unavailable</p></div>';
+        }
+    }
+    
+    // Update counter
+    counter.textContent = `${currentMediaIndex + 1} / ${currentMediaGallery.length}`;
+    
+    // Update navigation buttons
+    prevBtn.disabled = currentMediaIndex === 0;
+    nextBtn.disabled = currentMediaIndex === currentMediaGallery.length - 1;
+    prevBtn.style.display = currentMediaGallery.length > 1 ? 'flex' : 'none';
+    nextBtn.style.display = currentMediaGallery.length > 1 ? 'flex' : 'none';
+}
+
+function previousMedia() {
+    if (currentMediaIndex > 0) {
+        currentMediaIndex--;
+        updateLightboxContent();
+    }
+}
+
+function nextMedia() {
+    if (currentMediaIndex < currentMediaGallery.length - 1) {
+        currentMediaIndex++;
+        updateLightboxContent();
+    }
+}
+
+// Handle modal cleanup and window resize
+document.getElementById('mediaModal').addEventListener('hidden.bs.modal', function() {
+    // Pause any playing videos
+    const videos = this.querySelectorAll('video');
+    videos.forEach(video => {
+        if (!video.paused) {
+            video.pause();
+        }
+    });
+    
+    // Clear the container
+    document.getElementById('modalMediaContainer').innerHTML = '';
+});
+
+// Handle window resize to adjust image sizes in modal
+window.addEventListener('resize', function() {
+    const modal = document.getElementById('mediaModal');
+    if (modal && modal.classList.contains('show')) {
+        // Re-update content to adjust for new viewport size
+        setTimeout(updateLightboxContent, 100);
+    }
+});
+</script>
 {% endblock %}
