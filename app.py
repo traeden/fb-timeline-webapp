@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 import requests
 import json
 from datetime import datetime, timedelta
-from sqlalchemy import func, or_, and_
+from sqlalchemy import func, or_, and_, text
 from urllib.parse import urlencode
 from sqlalchemy.dialects.postgresql import JSON
 
@@ -448,24 +448,6 @@ def timeline():
         if keyword:
             query = query.filter(Post.message.ilike(f'%{keyword}%'))
         
-        # Photo filtering
-        if has_photo == 'yes':
-            query = query.filter(and_(Post.photos.isnot(None), func.json_array_length(Post.photos) > 0))
-        elif has_photo == 'no':
-            query = query.filter(or_(Post.photos.is_(None), func.json_array_length(Post.photos) == 0))
-        
-        # Video filtering
-        if has_video == 'yes':
-            query = query.filter(and_(Post.videos.isnot(None), func.json_array_length(Post.videos) > 0))
-        elif has_video == 'no':
-            query = query.filter(or_(Post.videos.is_(None), func.json_array_length(Post.videos) == 0))
-        
-        # Links filtering
-        if has_links == 'yes':
-            query = query.filter(and_(Post.links.isnot(None), func.json_array_length(Post.links) > 0))
-        elif has_links == 'no':
-            query = query.filter(or_(Post.links.is_(None), func.json_array_length(Post.links) == 0))
-        
         # Length filtering
         if min_length:
             try:
@@ -484,9 +466,45 @@ def timeline():
         elif has_tags == 'no':
             query = query.filter(~Post.message.ilike('%@%'))
     
-    db_posts = query.all()
-    print(f"Filtered posts count: {len(db_posts)}")
+    # Get all posts first, then apply JSON filtering in Python
+    all_posts = query.all()
     
+    # Apply JSON-based filters in Python
+    filtered_posts = []
+    for post in all_posts:
+        # Skip if clear_filters is true
+        if clear_filters == 'true':
+            filtered_posts.append(post)
+            continue
+        
+        # Photo filtering
+        if has_photo == 'yes':
+            if not post.photos or not isinstance(post.photos, list) or len(post.photos) == 0:
+                continue
+        elif has_photo == 'no':
+            if post.photos and isinstance(post.photos, list) and len(post.photos) > 0:
+                continue
+        
+        # Video filtering
+        if has_video == 'yes':
+            if not post.videos or not isinstance(post.videos, list) or len(post.videos) == 0:
+                continue
+        elif has_video == 'no':
+            if post.videos and isinstance(post.videos, list) and len(post.videos) > 0:
+                continue
+        
+        # Links filtering
+        if has_links == 'yes':
+            if not post.links or not isinstance(post.links, list) or len(post.links) == 0:
+                continue
+        elif has_links == 'no':
+            if post.links and isinstance(post.links, list) and len(post.links) > 0:
+                continue
+        
+        filtered_posts.append(post)
+    
+    db_posts = filtered_posts
+    print(f"Filtered posts count: {len(db_posts)}")    
     return render_template('timeline.html', posts=db_posts, user_data=user_data)
 
 @app.route('/debug')
