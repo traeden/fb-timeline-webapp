@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </select>
                 </div>
                 <div class="col-md-3 d-flex align-items-end">
-                    <div class="d-flex gap-2 w-100">
+                    <div class="d-flex gap-2 w-100" style="margin-top: 25px;">
                         <button type="submit" class="btn btn-primary flex-fill">Apply Filters</button>
                         <a href="{{ url_for('timeline') }}?clear_filters=true{% if request.args.get('api_start_date') %}&api_start_date={{ request.args.get('api_start_date') }}{% endif %}{% if request.args.get('api_end_date') %}&api_end_date={{ request.args.get('api_end_date') }}{% endif %}{% if request.args.get('api_post_type') %}&api_post_type={{ request.args.get('api_post_type') }}{% endif %}" class="btn btn-secondary flex-fill">Clear Filters</a>
                     </div>
@@ -708,10 +708,20 @@ document.addEventListener('DOMContentLoaded', function() {
     font-weight: 500;
 }
 
+/* Fixed container for consistent arrow positioning */
+#modalMediaContainer {
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 auto !important;
+}
+
+/* Move navigation arrows to bottom of container */
 .media-nav-btn {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
+    position: fixed !important;
+    bottom: 20% !important; /* Position near bottom instead of center */
+    transform: none !important; /* Remove the centering transform */
     background: rgba(255, 255, 255, 0.9);
     border: none;
     width: 50px;
@@ -723,21 +733,21 @@ document.addEventListener('DOMContentLoaded', function() {
     font-size: 1.2rem;
     cursor: pointer;
     transition: all 0.2s ease;
-    z-index: 1050;
+    z-index: 1060 !important;
     color: #333;
 }
 
 .media-nav-btn:hover {
     background: white;
-    transform: translateY(-50%) scale(1.1);
+    transform: scale(1.1); /* Remove translateY from hover since we're not centering */
 }
 
 .prev-btn {
-    left: 20px;
+    left: 30px !important;
 }
 
 .next-btn {
-    right: 20px;
+    right: 30px !important;
 }
 
 .media-nav-btn:disabled {
@@ -747,33 +757,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* Responsive Design */
 @media (max-width: 768px) {
-    .media-grid-3 {
-        max-height: 300px;
-    }
-    
-    .media-grid-4 {
-        max-height: 300px;
-    }
-    
-    .additional-media-grid {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    }
-    
     .media-nav-btn {
         width: 40px;
         height: 40px;
         font-size: 1rem;
+        bottom: 10% !important; /* Even lower on mobile */
     }
     
     .prev-btn {
-        left: 10px;
+        left: 15px !important;
     }
     
     .next-btn {
-        right: 10px;
+        right: 15px !important;
     }
 }
-
 /* Animation for expanding content */
 .additional-media-container {
     animation: fadeInDown 0.3s ease-out;
@@ -969,6 +967,9 @@ function initializeKeyboardNavigation() {
     });
 }
 
+// Store container dimensions for each post
+window.postContainerSizes = {};
+
 function openLightboxForItem(item) {
     const gallery = item.closest('.media-gallery');
     const postId = gallery.dataset.postId;
@@ -978,10 +979,121 @@ function openLightboxForItem(item) {
     if (window.postMediaData && window.postMediaData[postId]) {
         currentMediaGallery = window.postMediaData[postId];
         currentMediaIndex = clickedIndex;
-        showLightboxModal();
+        
+        // Calculate optimal container size for this post's media collection
+        calculateOptimalContainerSize(postId, () => {
+            showLightboxModal();
+        });
     } else {
         console.error('No media data found for post:', postId);
     }
+}
+
+function calculateOptimalContainerSize(postId, callback) {
+    // Check if we already calculated this post's container size
+    if (window.postContainerSizes[postId]) {
+        callback();
+        return;
+    }
+    
+    const mediaItems = window.postMediaData[postId];
+    const availableWidth = window.innerWidth * 0.9;
+    const availableHeight = window.innerHeight * 0.85;
+    
+    let maxWidth = 0;
+    let maxHeight = 0;
+    let loadedCount = 0;
+    const totalItems = mediaItems.length;
+    
+    // Function to check if all items are processed
+    const checkComplete = () => {
+        loadedCount++;
+        if (loadedCount === totalItems) {
+            // Store the calculated container size
+            window.postContainerSizes[postId] = {
+                width: maxWidth,
+                height: maxHeight
+            };
+            callback();
+        }
+    };
+    
+    mediaItems.forEach(media => {
+        if (media.type === 'photo') {
+            const img = new Image();
+            img.onload = function() {
+                const imgAspectRatio = this.naturalWidth / this.naturalHeight;
+                const availableAspectRatio = availableWidth / availableHeight;
+                
+                let itemWidth, itemHeight;
+                
+                if (imgAspectRatio > availableAspectRatio) {
+                    itemWidth = Math.min(this.naturalWidth, availableWidth);
+                    itemHeight = itemWidth / imgAspectRatio;
+                } else {
+                    itemHeight = Math.min(this.naturalHeight, availableHeight);
+                    itemWidth = itemHeight * imgAspectRatio;
+                }
+                
+                maxWidth = Math.max(maxWidth, itemWidth);
+                maxHeight = Math.max(maxHeight, itemHeight);
+                checkComplete();
+            };
+            img.onerror = checkComplete;
+            img.src = media.src;
+            
+        } else if (media.type === 'video') {
+            if (media.src) {
+                const video = document.createElement('video');
+                video.addEventListener('loadedmetadata', function() {
+                    const videoAspectRatio = this.videoWidth / this.videoHeight;
+                    const availableAspectRatio = availableWidth / availableHeight;
+                    
+                    let itemWidth, itemHeight;
+                    
+                    if (videoAspectRatio > availableAspectRatio) {
+                        itemWidth = Math.min(this.videoWidth, availableWidth);
+                        itemHeight = itemWidth / videoAspectRatio;
+                    } else {
+                        itemHeight = Math.min(this.videoHeight, availableHeight);
+                        itemWidth = itemHeight * videoAspectRatio;
+                    }
+                    
+                    maxWidth = Math.max(maxWidth, itemWidth);
+                    maxHeight = Math.max(maxHeight, itemHeight);
+                    checkComplete();
+                });
+                video.addEventListener('error', checkComplete);
+                video.src = media.src;
+                
+            } else if (media.thumbnail) {
+                const img = new Image();
+                img.onload = function() {
+                    const imgAspectRatio = this.naturalWidth / this.naturalHeight;
+                    const availableAspectRatio = availableWidth / availableHeight;
+                    
+                    let itemWidth, itemHeight;
+                    
+                    if (imgAspectRatio > availableAspectRatio) {
+                        itemWidth = Math.min(this.naturalWidth, availableWidth);
+                        itemHeight = itemWidth / imgAspectRatio;
+                    } else {
+                        itemHeight = Math.min(this.naturalHeight, availableHeight);
+                        itemWidth = itemHeight * imgAspectRatio;
+                    }
+                    
+                    maxWidth = Math.max(maxWidth, itemWidth);
+                    maxHeight = Math.max(maxHeight, itemHeight);
+                    checkComplete();
+                };
+                img.onerror = checkComplete;
+                img.src = media.thumbnail;
+            } else {
+                // No media to size, use default
+                checkComplete();
+            }
+        }
+    });
 }
 
 function showLightboxModal() {
@@ -1051,51 +1163,79 @@ function updateLightboxContent() {
     const prevBtn = document.querySelector('.prev-btn');
     const nextBtn = document.querySelector('.next-btn');
     
+    // Get the current post ID to access the fixed container size
+    const galleryElement = document.querySelector('.media-gallery[data-expanded]') || document.querySelector('.media-gallery');
+    const postId = galleryElement ? galleryElement.dataset.postId : null;
+    const containerSize = postId ? window.postContainerSizes[postId] : null;
+    
     // Clear previous content
     container.innerHTML = '';
     
-    // Reset container styles for dynamic sizing
-    container.style.width = 'auto';
-    container.style.height = 'auto';
-    container.style.minHeight = 'auto';
+    // Set fixed container size if available
+    if (containerSize) {
+        container.style.width = containerSize.width + 'px';
+        container.style.height = containerSize.height + 'px';
+    } else {
+        // Fallback to auto sizing
+        container.style.width = 'auto';
+        container.style.height = 'auto';
+    }
     
-    // Create media element with enhanced aspect ratio handling
+    // Create media element centered within the fixed container
     if (media.type === 'photo') {
         const img = document.createElement('img');
         img.src = media.src;
         img.alt = media.alt || 'Photo';
         
-        // Enhanced image loading with proper aspect ratio preservation
+        // Enhanced image loading with centering within fixed container
         img.onload = function() {
-            // Calculate available space (leaving room for header and navigation)
-            const availableWidth = window.innerWidth * 0.9; // 90vw
-            const availableHeight = window.innerHeight * 0.85; // 85vh
-            
-            const imgAspectRatio = this.naturalWidth / this.naturalHeight;
-            const availableAspectRatio = availableWidth / availableHeight;
-            
-            let finalWidth, finalHeight;
-            
-            // Determine optimal sizing to maintain aspect ratio
-            if (imgAspectRatio > availableAspectRatio) {
-                // Image is wider than available space - constrain by width
-                finalWidth = Math.min(this.naturalWidth, availableWidth);
-                finalHeight = finalWidth / imgAspectRatio;
+            if (containerSize) {
+                // Calculate how to fit this image within the fixed container
+                const imgAspectRatio = this.naturalWidth / this.naturalHeight;
+                const containerAspectRatio = containerSize.width / containerSize.height;
+                
+                let finalWidth, finalHeight;
+                
+                if (imgAspectRatio > containerAspectRatio) {
+                    // Image is wider than container - fit by width
+                    finalWidth = Math.min(this.naturalWidth, containerSize.width);
+                    finalHeight = finalWidth / imgAspectRatio;
+                } else {
+                    // Image is taller than container - fit by height
+                    finalHeight = Math.min(this.naturalHeight, containerSize.height);
+                    finalWidth = finalHeight * imgAspectRatio;
+                }
+                
+                this.style.width = finalWidth + 'px';
+                this.style.height = finalHeight + 'px';
             } else {
-                // Image is taller than available space - constrain by height
-                finalHeight = Math.min(this.naturalHeight, availableHeight);
-                finalWidth = finalHeight * imgAspectRatio;
+                // Fallback to viewport-based sizing
+                const availableWidth = window.innerWidth * 0.9;
+                const availableHeight = window.innerHeight * 0.85;
+                const imgAspectRatio = this.naturalWidth / this.naturalHeight;
+                const availableAspectRatio = availableWidth / availableHeight;
+                
+                let finalWidth, finalHeight;
+                
+                if (imgAspectRatio > availableAspectRatio) {
+                    finalWidth = Math.min(this.naturalWidth, availableWidth);
+                    finalHeight = finalWidth / imgAspectRatio;
+                } else {
+                    finalHeight = Math.min(this.naturalHeight, availableHeight);
+                    finalWidth = finalHeight * imgAspectRatio;
+                }
+                
+                this.style.width = finalWidth + 'px';
+                this.style.height = finalHeight + 'px';
+                container.style.width = finalWidth + 'px';
+                container.style.height = finalHeight + 'px';
             }
             
-            // Apply calculated dimensions
-            this.style.width = finalWidth + 'px';
-            this.style.height = finalHeight + 'px';
-            this.style.maxWidth = 'none';
-            this.style.maxHeight = 'none';
-            
-            // Adjust container to fit content exactly
-            container.style.width = finalWidth + 'px';
-            container.style.height = finalHeight + 'px';
+            // Center the image within the container
+            this.style.position = 'absolute';
+            this.style.top = '50%';
+            this.style.left = '50%';
+            this.style.transform = 'translate(-50%, -50%)';
         };
         
         img.onerror = () => {
@@ -1105,9 +1245,16 @@ function updateLightboxContent() {
         // Apply initial styles
         img.style.borderRadius = '8px';
         img.style.display = 'block';
-        img.style.margin = '0 auto';
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '100%';
         
-        container.appendChild(img);
+        // Create a wrapper for absolute positioning
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'relative';
+        wrapper.style.width = '100%';
+        wrapper.style.height = '100%';
+        wrapper.appendChild(img);
+        container.appendChild(wrapper);
         
     } else if (media.type === 'video') {
         if (media.src) {
@@ -1118,28 +1265,51 @@ function updateLightboxContent() {
             
             // Calculate optimal size similar to images
             video.addEventListener('loadedmetadata', function() {
-                const availableWidth = window.innerWidth * 0.9;
-                const availableHeight = window.innerHeight * 0.85;
-                
-                const videoAspectRatio = this.videoWidth / this.videoHeight;
-                const availableAspectRatio = availableWidth / availableHeight;
-                
-                let finalWidth, finalHeight;
-                
-                if (videoAspectRatio > availableAspectRatio) {
-                    finalWidth = Math.min(this.videoWidth, availableWidth);
-                    finalHeight = finalWidth / videoAspectRatio;
+                if (containerSize) {
+                    const videoAspectRatio = this.videoWidth / this.videoHeight;
+                    const containerAspectRatio = containerSize.width / containerSize.height;
+                    
+                    let finalWidth, finalHeight;
+                    
+                    if (videoAspectRatio > containerAspectRatio) {
+                        finalWidth = Math.min(this.videoWidth, containerSize.width);
+                        finalHeight = finalWidth / videoAspectRatio;
+                    } else {
+                        finalHeight = Math.min(this.videoHeight, containerSize.height);
+                        finalWidth = finalHeight * videoAspectRatio;
+                    }
+                    
+                    this.style.width = finalWidth + 'px';
+                    this.style.height = finalHeight + 'px';
                 } else {
-                    finalHeight = Math.min(this.videoHeight, availableHeight);
-                    finalWidth = finalHeight * videoAspectRatio;
+                    // Fallback sizing
+                    const availableWidth = window.innerWidth * 0.9;
+                    const availableHeight = window.innerHeight * 0.85;
+                    
+                    const videoAspectRatio = this.videoWidth / this.videoHeight;
+                    const availableAspectRatio = availableWidth / availableHeight;
+                    
+                    let finalWidth, finalHeight;
+                    
+                    if (videoAspectRatio > availableAspectRatio) {
+                        finalWidth = Math.min(this.videoWidth, availableWidth);
+                        finalHeight = finalWidth / videoAspectRatio;
+                    } else {
+                        finalHeight = Math.min(this.videoHeight, availableHeight);
+                        finalWidth = finalHeight * videoAspectRatio;
+                    }
+                    
+                    this.style.width = finalWidth + 'px';
+                    this.style.height = finalHeight + 'px';
+                    container.style.width = finalWidth + 'px';
+                    container.style.height = finalHeight + 'px';
                 }
                 
-                this.style.width = finalWidth + 'px';
-                this.style.height = finalHeight + 'px';
-                
-                // Adjust container
-                container.style.width = finalWidth + 'px';
-                container.style.height = finalHeight + 'px';
+                // Center the video
+                this.style.position = 'absolute';
+                this.style.top = '50%';
+                this.style.left = '50%';
+                this.style.transform = 'translate(-50%, -50%)';
             });
             
             if (media.thumbnail) {
@@ -1157,43 +1327,74 @@ function updateLightboxContent() {
             
             video.style.borderRadius = '8px';
             video.style.display = 'block';
-            video.style.margin = '0 auto';
+            video.style.maxWidth = '100%';
+            video.style.maxHeight = '100%';
             
-            container.appendChild(video);
+            // Create wrapper for absolute positioning
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'relative';
+            wrapper.style.width = '100%';
+            wrapper.style.height = '100%';
+            wrapper.appendChild(video);
+            container.appendChild(wrapper);
             
         } else if (media.thumbnail) {
-            // Handle video thumbnail case (same as before but with dynamic sizing)
+            // Handle video thumbnail case with fixed container
             const img = document.createElement('img');
             img.src = media.thumbnail;
             img.alt = media.alt || 'Video thumbnail';
             
             img.onload = function() {
-                const availableWidth = window.innerWidth * 0.9;
-                const availableHeight = window.innerHeight * 0.85;
-                
-                const imgAspectRatio = this.naturalWidth / this.naturalHeight;
-                const availableAspectRatio = availableWidth / availableHeight;
-                
-                let finalWidth, finalHeight;
-                
-                if (imgAspectRatio > availableAspectRatio) {
-                    finalWidth = Math.min(this.naturalWidth, availableWidth);
-                    finalHeight = finalWidth / imgAspectRatio;
+                if (containerSize) {
+                    const imgAspectRatio = this.naturalWidth / this.naturalHeight;
+                    const containerAspectRatio = containerSize.width / containerSize.height;
+                    
+                    let finalWidth, finalHeight;
+                    
+                    if (imgAspectRatio > containerAspectRatio) {
+                        finalWidth = Math.min(this.naturalWidth, containerSize.width);
+                        finalHeight = finalWidth / imgAspectRatio;
+                    } else {
+                        finalHeight = Math.min(this.naturalHeight, containerSize.height);
+                        finalWidth = finalHeight * imgAspectRatio;
+                    }
+                    
+                    this.style.width = finalWidth + 'px';
+                    this.style.height = finalHeight + 'px';
                 } else {
-                    finalHeight = Math.min(this.naturalHeight, availableHeight);
-                    finalWidth = finalHeight * imgAspectRatio;
+                    // Fallback sizing
+                    const availableWidth = window.innerWidth * 0.9;
+                    const availableHeight = window.innerHeight * 0.85;
+                    const imgAspectRatio = this.naturalWidth / this.naturalHeight;
+                    const availableAspectRatio = availableWidth / availableHeight;
+                    
+                    let finalWidth, finalHeight;
+                    
+                    if (imgAspectRatio > availableAspectRatio) {
+                        finalWidth = Math.min(this.naturalWidth, availableWidth);
+                        finalHeight = finalWidth / imgAspectRatio;
+                    } else {
+                        finalHeight = Math.min(this.naturalHeight, availableHeight);
+                        finalWidth = finalHeight * imgAspectRatio;
+                    }
+                    
+                    this.style.width = finalWidth + 'px';
+                    this.style.height = finalHeight + 'px';
+                    container.style.width = finalWidth + 'px';
+                    container.style.height = finalHeight + 'px';
                 }
                 
-                this.style.width = finalWidth + 'px';
-                this.style.height = finalHeight + 'px';
-                
-                container.style.width = finalWidth + 'px';
-                container.style.height = finalHeight + 'px';
+                // Center the thumbnail
+                this.style.position = 'absolute';
+                this.style.top = '50%';
+                this.style.left = '50%';
+                this.style.transform = 'translate(-50%, -50%)';
             };
             
             img.style.borderRadius = '8px';
             img.style.display = 'block';
-            img.style.margin = '0 auto';
+            img.style.maxWidth = '100%';
+            img.style.maxHeight = '100%';
             
             // Add play overlay
             const overlay = document.createElement('div');
@@ -1210,11 +1411,13 @@ function updateLightboxContent() {
             overlay.style.alignItems = 'center';
             overlay.style.justifyContent = 'center';
             overlay.style.fontSize = '2rem';
+            overlay.style.zIndex = '10';
             overlay.innerHTML = '<i class="fas fa-play"></i>';
             
             const wrapper = document.createElement('div');
             wrapper.style.position = 'relative';
-            wrapper.style.display = 'inline-block';
+            wrapper.style.width = '100%';
+            wrapper.style.height = '100%';
             wrapper.appendChild(img);
             wrapper.appendChild(overlay);
             
