@@ -1,3 +1,16 @@
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== BOOTSTRAP DEBUG ===');
+    console.log('bootstrap available:', typeof bootstrap !== 'undefined');
+    console.log('jQuery available:', typeof $ !== 'undefined');
+    console.log('Bootstrap version:', window.bootstrap?.VERSION || 'Not found');
+    console.log('jQuery modal:', typeof $.fn?.modal);
+    console.log('======================');
+});
+</script>
+
+
+
 {% extends "bootstrap/base.html" %}
 {% block title %}Timeline{% endblock %}
 
@@ -628,6 +641,38 @@
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
+/* Enhanced modal backdrop for dynamic sizing */
+.modal-body {
+    min-height: auto !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+#modalMediaContainer {
+    max-width: 90vw;
+    max-height: 85vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Ensure modal centers properly */
+.modal-dialog {
+    margin: auto;
+    display: flex;
+    align-items: center;
+    min-height: calc(100vh - 60px);
+}
+
+.modal-content {
+    width: auto !important;
+    max-width: none !important;
+    background: transparent !important;
+    border: none !important;
+}
+
 /* Enhanced Modal Styles */
 .modal-content {
     background: #000 !important;
@@ -746,7 +791,42 @@
 }
 </style>
 
-<!-- Enhanced JavaScript for Media Gallery with Improved Image Handling -->
+<!-- Add this script block before your existing JavaScript -->
+<script>
+// Store media data for each post
+window.postMediaData = {};
+
+{% for post in posts %}
+    {% if post.photos or post.videos %}
+        {% set combined_media = [] %}
+        {% if post.photos %}
+            {% for photo in post.photos %}
+                {% set _ = combined_media.append({
+                    'type': 'photo',
+                    'src': photo.src,
+                    'alt': 'Photo ' ~ loop.index
+                }) %}
+            {% endfor %}
+        {% endif %}
+        {% if post.videos %}
+            {% for video in post.videos %}
+                {% set _ = combined_media.append({
+                    'type': 'video',
+                    'src': video.src if video.src else None,
+                    'thumbnail': video.thumbnail if video.thumbnail else None,
+                    'url': video.url if video.url else None,
+                    'title': video.title if video.title else None,
+                    'alt': 'Video ' ~ loop.index
+                }) %}
+            {% endfor %}
+        {% endif %}
+        
+        window.postMediaData['{{ post.facebook_id }}'] = {{ combined_media | tojson | safe }};
+    {% endif %}
+{% endfor %}
+</script>
+
+<!-- Modified JavaScript -->
 <script>
 let currentMediaGallery = [];
 let currentMediaIndex = 0;
@@ -802,11 +882,6 @@ function initializeExpandButtons() {
 function initializeMediaClicks() {
     document.querySelectorAll('.media-item').forEach(item => {
         item.addEventListener('click', function(e) {
-            // Don't open lightbox if clicking on video controls
-            if (e.target.closest('video') && !e.target.classList.contains('media-content')) {
-                return;
-            }
-            
             // Don't open lightbox for more overlay clicks (handle separately)
             if (e.target.closest('.more-overlay')) {
                 const gallery = this.closest('.media-gallery');
@@ -817,17 +892,36 @@ function initializeMediaClicks() {
                 return;
             }
             
+            // For videos, check if clicking on actual video element or controls
+            const clickedVideo = e.target.closest('video');
+            if (clickedVideo) {
+                // If clicking on video but not on controls, open lightbox
+                const rect = clickedVideo.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+                
+                // Check if click is in the control bar area (usually bottom 15% of video)
+                const controlAreaHeight = rect.height * 0.15;
+                const isInControlArea = clickY > (rect.height - controlAreaHeight);
+                
+                if (!isInControlArea) {
+                    // Clicked on video content area, open lightbox
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openLightboxForItem(this);
+                    return;
+                }
+                // Otherwise, let the video handle the click normally
+                return;
+            }
+            
+            // For all other media (photos, video thumbnails), open lightbox
             openLightboxForItem(this);
         });
     });
     
-    // Handle video interactions specifically
+    // Handle video play/pause specifically without interfering with lightbox
     document.querySelectorAll('.media-item video').forEach(video => {
-        video.addEventListener('click', function(e) {
-            e.stopPropagation();
-            // Allow native video controls
-        });
-        
         // Pause other videos when one plays
         video.addEventListener('play', function() {
             document.querySelectorAll('video').forEach(otherVideo => {
@@ -842,7 +936,9 @@ function initializeMediaClicks() {
 function initializeKeyboardNavigation() {
     document.addEventListener('keydown', function(e) {
         const modal = document.getElementById('mediaModal');
-        if (modal && modal.classList.contains('show')) {
+        const isModalOpen = modal && (modal.classList.contains('show') || modal.style.display === 'block');
+        
+        if (isModalOpen) {
             switch(e.key) {
                 case 'ArrowLeft':
                     e.preventDefault();
@@ -854,7 +950,19 @@ function initializeKeyboardNavigation() {
                     break;
                 case 'Escape':
                     e.preventDefault();
-                    bootstrap.Modal.getInstance(modal).hide();
+                    // Try Bootstrap modal close first
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        const modalInstance = bootstrap.Modal.getInstance(modal);
+                        if (modalInstance) {
+                            modalInstance.hide();
+                        } else {
+                            closeManualModal();
+                        }
+                    } else if (typeof $ !== 'undefined' && $.fn.modal) {
+                        $(modal).modal('hide');
+                    } else {
+                        closeManualModal();
+                    }
                     break;
             }
         }
@@ -866,24 +974,72 @@ function openLightboxForItem(item) {
     const postId = gallery.dataset.postId;
     const clickedIndex = parseInt(item.dataset.mediaIndex);
     
-    // Prepare media data from the gallery
-    const mediaListJson = gallery.dataset.mediaList;
-    if (mediaListJson) {
-        try {
-            currentMediaGallery = JSON.parse(mediaListJson);
-            currentMediaIndex = clickedIndex;
-            showLightboxModal();
-        } catch (e) {
-            console.error('Failed to parse media list:', e);
-        }
+    // Get media data from the global object instead of parsing from attribute
+    if (window.postMediaData && window.postMediaData[postId]) {
+        currentMediaGallery = window.postMediaData[postId];
+        currentMediaIndex = clickedIndex;
+        showLightboxModal();
+    } else {
+        console.error('No media data found for post:', postId);
     }
 }
 
 function showLightboxModal() {
     updateLightboxContent();
     const modalElement = document.getElementById('mediaModal');
-    const modal = new bootstrap.Modal(modalElement);
-    modal.show();
+    
+    // Try multiple Bootstrap approaches
+    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        // Bootstrap 5
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    } else if (typeof $ !== 'undefined' && $.fn.modal) {
+        // jQuery Bootstrap (Bootstrap 4 or earlier)
+        $(modalElement).modal('show');
+    } else {
+        // Manual fallback
+        console.warn('Bootstrap not available, using manual modal');
+        modalElement.classList.add('show');
+        modalElement.style.display = 'block';
+        modalElement.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+        
+        // Add backdrop
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop fade show';
+        backdrop.id = 'manual-backdrop';
+        document.body.appendChild(backdrop);
+        
+        // Close on backdrop click
+        backdrop.addEventListener('click', closeManualModal);
+        
+        // Close on escape key (already handled by existing keyboard listener)
+    }
+}
+
+function closeManualModal() {
+    const modalElement = document.getElementById('mediaModal');
+    const backdrop = document.getElementById('manual-backdrop');
+    
+    modalElement.classList.remove('show');
+    modalElement.style.display = 'none';
+    modalElement.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+    
+    if (backdrop) {
+        backdrop.remove();
+    }
+    
+    // Pause any playing videos
+    const videos = modalElement.querySelectorAll('video');
+    videos.forEach(video => {
+        if (!video.paused) {
+            video.pause();
+        }
+    });
+    
+    // Clear the container
+    document.getElementById('modalMediaContainer').innerHTML = '';
 }
 
 function updateLightboxContent() {
@@ -898,6 +1054,11 @@ function updateLightboxContent() {
     // Clear previous content
     container.innerHTML = '';
     
+    // Reset container styles for dynamic sizing
+    container.style.width = 'auto';
+    container.style.height = 'auto';
+    container.style.minHeight = 'auto';
+    
     // Create media element with enhanced aspect ratio handling
     if (media.type === 'photo') {
         const img = document.createElement('img');
@@ -906,25 +1067,35 @@ function updateLightboxContent() {
         
         // Enhanced image loading with proper aspect ratio preservation
         img.onload = function() {
+            // Calculate available space (leaving room for header and navigation)
+            const availableWidth = window.innerWidth * 0.9; // 90vw
+            const availableHeight = window.innerHeight * 0.85; // 85vh
+            
             const imgAspectRatio = this.naturalWidth / this.naturalHeight;
-            const viewportAspectRatio = window.innerWidth / window.innerHeight;
+            const availableAspectRatio = availableWidth / availableHeight;
+            
+            let finalWidth, finalHeight;
             
             // Determine optimal sizing to maintain aspect ratio
-            if (imgAspectRatio > viewportAspectRatio) {
-                // Wide image
-                this.style.maxWidth = '90vw';
-                this.style.maxHeight = 'none';
-                this.style.height = 'auto';
+            if (imgAspectRatio > availableAspectRatio) {
+                // Image is wider than available space - constrain by width
+                finalWidth = Math.min(this.naturalWidth, availableWidth);
+                finalHeight = finalWidth / imgAspectRatio;
             } else {
-                // Tall image
-                this.style.maxHeight = '85vh';
-                this.style.maxWidth = 'none';
-                this.style.width = 'auto';
+                // Image is taller than available space - constrain by height
+                finalHeight = Math.min(this.naturalHeight, availableHeight);
+                finalWidth = finalHeight * imgAspectRatio;
             }
             
-            // Center the image
-            this.style.objectFit = 'contain';
-            this.style.objectPosition = 'center';
+            // Apply calculated dimensions
+            this.style.width = finalWidth + 'px';
+            this.style.height = finalHeight + 'px';
+            this.style.maxWidth = 'none';
+            this.style.maxHeight = 'none';
+            
+            // Adjust container to fit content exactly
+            container.style.width = finalWidth + 'px';
+            container.style.height = finalHeight + 'px';
         };
         
         img.onerror = () => {
@@ -933,7 +1104,6 @@ function updateLightboxContent() {
         
         // Apply initial styles
         img.style.borderRadius = '8px';
-        img.style.background = '#111';
         img.style.display = 'block';
         img.style.margin = '0 auto';
         
@@ -944,15 +1114,33 @@ function updateLightboxContent() {
             const video = document.createElement('video');
             video.controls = true;
             video.autoplay = false;
-            video.style.maxWidth = '90vw';
-            video.style.maxHeight = '85vh';
-            video.style.objectFit = 'contain';
-            video.style.objectPosition = 'center';
-            video.style.borderRadius = '8px';
-            video.style.background = '#111';
             video.preload = 'metadata';
-            video.style.display = 'block';
-            video.style.margin = '0 auto';
+            
+            // Calculate optimal size similar to images
+            video.addEventListener('loadedmetadata', function() {
+                const availableWidth = window.innerWidth * 0.9;
+                const availableHeight = window.innerHeight * 0.85;
+                
+                const videoAspectRatio = this.videoWidth / this.videoHeight;
+                const availableAspectRatio = availableWidth / availableHeight;
+                
+                let finalWidth, finalHeight;
+                
+                if (videoAspectRatio > availableAspectRatio) {
+                    finalWidth = Math.min(this.videoWidth, availableWidth);
+                    finalHeight = finalWidth / videoAspectRatio;
+                } else {
+                    finalHeight = Math.min(this.videoHeight, availableHeight);
+                    finalWidth = finalHeight * videoAspectRatio;
+                }
+                
+                this.style.width = finalWidth + 'px';
+                this.style.height = finalHeight + 'px';
+                
+                // Adjust container
+                container.style.width = finalWidth + 'px';
+                container.style.height = finalHeight + 'px';
+            });
             
             if (media.thumbnail) {
                 video.poster = media.thumbnail;
@@ -967,34 +1155,43 @@ function updateLightboxContent() {
                 container.innerHTML = '<div class="text-white text-center"><i class="fas fa-exclamation-triangle fa-3x mb-3"></i><p>Video failed to load</p></div>';
             };
             
+            video.style.borderRadius = '8px';
+            video.style.display = 'block';
+            video.style.margin = '0 auto';
+            
             container.appendChild(video);
             
         } else if (media.thumbnail) {
+            // Handle video thumbnail case (same as before but with dynamic sizing)
             const img = document.createElement('img');
             img.src = media.thumbnail;
             img.alt = media.alt || 'Video thumbnail';
             
-            // Same enhanced loading for video thumbnails
             img.onload = function() {
-                const imgAspectRatio = this.naturalWidth / this.naturalHeight;
-                const viewportAspectRatio = window.innerWidth / window.innerHeight;
+                const availableWidth = window.innerWidth * 0.9;
+                const availableHeight = window.innerHeight * 0.85;
                 
-                if (imgAspectRatio > viewportAspectRatio) {
-                    this.style.maxWidth = '90vw';
-                    this.style.maxHeight = 'none';
-                    this.style.height = 'auto';
+                const imgAspectRatio = this.naturalWidth / this.naturalHeight;
+                const availableAspectRatio = availableWidth / availableHeight;
+                
+                let finalWidth, finalHeight;
+                
+                if (imgAspectRatio > availableAspectRatio) {
+                    finalWidth = Math.min(this.naturalWidth, availableWidth);
+                    finalHeight = finalWidth / imgAspectRatio;
                 } else {
-                    this.style.maxHeight = '85vh';
-                    this.style.maxWidth = 'none';
-                    this.style.width = 'auto';
+                    finalHeight = Math.min(this.naturalHeight, availableHeight);
+                    finalWidth = finalHeight * imgAspectRatio;
                 }
                 
-                this.style.objectFit = 'contain';
-                this.style.objectPosition = 'center';
+                this.style.width = finalWidth + 'px';
+                this.style.height = finalHeight + 'px';
+                
+                container.style.width = finalWidth + 'px';
+                container.style.height = finalHeight + 'px';
             };
             
             img.style.borderRadius = '8px';
-            img.style.background = '#111';
             img.style.display = 'block';
             img.style.margin = '0 auto';
             
