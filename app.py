@@ -366,13 +366,13 @@ def timeline():
         
         print(f"API Response Status: {posts_response.status_code}")
         print(f"API Response Keys: {list(posts_data.keys())}")
-        
+
         if 'error' in posts_data:
             print(f"API Error: {posts_data['error']}")
             if 'Please reduce the amount of data' in posts_data.get('error', {}).get('message', ''):
-                return "Error: Too much data requested. Please narrow the date range and retry.", 400
-            return f"Error fetching posts: {posts_data['error']['message']}", 500
-        
+                return render_template('error.html', message="Error: Too much data requested. Please narrow the date range and retry."), 400
+            return render_template('error.html', message=f"Error fetching posts: {posts_data['error']['message']}"), 500
+                
         print(f"Raw API Response: {json.dumps(posts_data, indent=2)[:1000]}...")
         
         # Store posts in database with multiple attachments
