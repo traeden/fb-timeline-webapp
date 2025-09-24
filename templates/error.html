@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Sep 24 10:30:20 2025
+
+@author: traedennord
+"""
+
+# Content of error.html:
+{% extends "bootstrap/base.html" %}
+{% block title %}Error{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-xl-6">
+            <div class="alert alert-danger" role="alert">
+                <h4 class="alert-heading">Error</h4>
+                <p>{{ message }}</p>
+            </div>
+            <div class="text-center mt-4">
+                <a href="{{ url_for('home') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Home
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
