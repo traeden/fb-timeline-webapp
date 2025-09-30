@@ -36,6 +36,17 @@ class Post(db.Model):
     photos = db.Column(JSON, nullable=True)  # Array of photo objects
     videos = db.Column(JSON, nullable=True)  # Array of video objects
     links = db.Column(JSON, nullable=True)   # Array of link objects
+    from_data = db.Column(JSON, nullable=True)  # Author information
+    comments = db.Column(JSON, nullable=True)  # Array of comment objects
+
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    facebook_id = db.Column(db.String(100), unique=True)
+    post_id = db.Column(db.String(100), db.ForeignKey('post.facebook_id'))
+    message = db.Column(db.Text)
+    created_time = db.Column(db.String(50))
+    from_data = db.Column(JSON, nullable=True)  # Commenter information
+    like_count = db.Column(db.Integer, default=0)
 
 FB_APP_ID = os.getenv('FB_APP_ID')
 FB_APP_SECRET = os.getenv('FB_APP_SECRET')
@@ -89,39 +100,6 @@ def process_attachments(post_data):
                 'description': attachment.get('description', '')
             }
             videos.append(video_data)
-            print(f"    Added video: {video_data['src'][:50] if video_data['src'] else 'no source'}...")
-            
-        # Handle albums (can contain photos, videos, or mixed media)
-        elif attachment_type == 'album':
-            subattachments = attachment.get('subattachments', {}).get('data', [])
-            print(f"    Processing album with {len(subattachments)} subattachments")
-            for subattachment in subattachments:
-                sub_type = subattachment.get('type', '')
-                sub_media_type = subattachment.get('media_type', '')
-                print(f"      Subattachment: type={sub_type}, media_type={sub_media_type}")
-                
-                if sub_type == 'photo' or sub_media_type == 'photo':
-                    media = subattachment.get('media', {})
-                    if 'image' in media:
-                        photos.append({
-                            'src': media['image'].get('src', ''),
-                            'width': media['image'].get('width', 0),
-                            'height': media['image'].get('height', 0),
-                            'url': subattachment.get('url', ''),
-                            'title': subattachment.get('title', '')
-                        })
-                        print(f"        Added photo: {media['image'].get('src', '')[:50]}...")
-                elif sub_type == 'video' or sub_media_type == 'video':
-                    media = subattachment.get('media', {})
-                    video_data = {
-                        'src': media.get('source', ''),
-                        'thumbnail': media.get('image', {}).get('src', '') if media.get('image') else '',
-                        'url': subattachment.get('url', ''),
-                        'title': subattachment.get('title', ''),
-                        'description': subattachment.get('description', '')
-                    }
-                    videos.append(video_data)
-                    print(f"        Added video: {video_data['src'][:50] if video_data['src'] else 'no source'}...")
                         
         # Handle shared links
         elif attachment_type == 'share' or attachment_type == 'link' or media_type == 'link':
@@ -144,13 +122,69 @@ def process_attachments(post_data):
                     link_data['domain'] = ''
             
             links.append(link_data)
-            print(f"    Added link: {link_data['url'][:50] if link_data['url'] else 'no url'}...")
         
-        # Handle restricted/unavailable content
-        elif attachment_type == 'native_templates':
-            print(f"    Skipping restricted content: {attachment.get('title', 'No title')}")
+        # Handle albums (can contain photos, videos, or mixed media)
+        elif attachment_type == 'album':
+            subattachments = attachment.get('subattachments', {}).get('data', [])
+            for subattachment in subattachments:
+                sub_type = subattachment.get('type', '')
+                sub_media_type = subattachment.get('media_type', '')
+                
+                if sub_type == 'photo' or sub_media_type == 'photo':
+                    media = subattachment.get('media', {})
+                    if 'image' in media:
+                        photos.append({
+                            'src': media['image'].get('src', ''),
+                            'width': media['image'].get('width', 0),
+                            'height': media['image'].get('height', 0),
+                            'url': subattachment.get('url', ''),
+                            'title': subattachment.get('title', '')
+                        })
+                elif sub_type == 'video' or sub_media_type == 'video':
+                    media = subattachment.get('media', {})
+                    video_data = {
+                        'src': media.get('source', ''),
+                        'thumbnail': media.get('image', {}).get('src', '') if media.get('image') else '',
+                        'url': subattachment.get('url', ''),
+                        'title': subattachment.get('title', ''),
+                        'description': subattachment.get('description', '')
+                    }
+                    videos.append(video_data)
     
     return photos, videos, links
+
+def process_comments(post_id, access_token):
+    """
+    Fetch and process comments for a specific post
+    """
+    comments_url = (
+        f'https://graph.facebook.com/v18.0/{post_id}/comments'
+        f'?access_token={access_token}'
+        f'&fields=id,message,created_time,from,like_count'
+        f'&limit=50'
+    )
+    
+    try:
+        response = requests.get(comments_url)
+        comments_data = response.json()
+        
+        if 'data' in comments_data:
+            comments = []
+            for comment in comments_data['data']:
+                comments.append({
+                    'id': comment['id'],
+                    'message': comment.get('message', ''),
+                    'created_time': comment['created_time'],
+                    'from': comment.get('from', {}),
+                    'like_count': comment.get('like_count', 0)
+                })
+            return comments
+        else:
+            print(f"No comments found for post {post_id}")
+            return []
+    except Exception as e:
+        print(f"Error fetching comments for post {post_id}: {e}")
+        return []
 
 @app.route('/')
 def home():
@@ -162,9 +196,6 @@ def login():
     api_end_date = request.args.get('api_end_date')
     api_post_type = request.args.get('api_post_type')
     
-    # Debug: Print what we received from the form
-    print(f"Login received - api_start_date: {api_start_date}, api_end_date: {api_end_date}, api_post_type: {api_post_type}")
-    
     # Store parameters in session
     session['api_filters'] = {
         'start_date': api_start_date,
@@ -172,30 +203,14 @@ def login():
         'post_type': api_post_type
     }
     
-    # Build query parameters properly
-    params = {}
-    if api_start_date is not None:
-        params['api_start_date'] = api_start_date
-    if api_end_date is not None:
-        params['api_end_date'] = api_end_date
-    if api_post_type is not None:
-        params['api_post_type'] = api_post_type
-    
-    # Construct full redirect_uri with query parameters (only if params exist and are not empty)
-    full_redirect_uri = REDIRECT_URI
-    if params and any(v for v in params.values() if v):  # Only add params if they have values
-        full_redirect_uri += '?' + urlencode(params)
-    
-    # Store the full redirect_uri in session
-    session['original_redirect_uri'] = full_redirect_uri
-    
-    print(f"OAuth redirect_uri: {full_redirect_uri}")
+    # Use clean redirect_uri
+    session['original_redirect_uri'] = REDIRECT_URI
     
     fb_login_url = (
         f'https://www.facebook.com/v18.0/dialog/oauth'
         f'?client_id={FB_APP_ID}'
-        f'&redirect_uri={full_redirect_uri}'
-        f'&scope=public_profile,user_posts'
+        f'&redirect_uri={REDIRECT_URI}'
+        f'&scope=public_profile,user_posts,user_photos'
     )
     return redirect(fb_login_url)
 
@@ -205,7 +220,6 @@ def callback():
     if not code:
         return 'Error: No code received', 400
     
-    # Retrieve the original redirect_uri from session
     original_redirect_uri = session.get('original_redirect_uri', REDIRECT_URI)
     
     # Retrieve parameters from session
@@ -214,19 +228,25 @@ def callback():
     api_end_date = api_filters.get('end_date')
     api_post_type = api_filters.get('post_type')
     
-    # Debug: Print callback parameters
-    print(f"Callback retrieved - api_start_date: {api_start_date}, api_end_date: {api_end_date}, api_post_type: {api_post_type}")
+    # Token exchange
+    token_url = (
+        f'https://graph.facebook.com/v18.0/oauth/access_token'
+        f'?client_id={FB_APP_ID}'
+        f'&redirect_uri={original_redirect_uri}'
+        f'&client_secret={FB_APP_SECRET}'
+        f'&code={code}'
+    )
     
-    # Add all query parameters, preserving session values
-    query_params = {}
-    if api_start_date is not None:
-        query_params['api_start_date'] = api_start_date
-    if api_end_date is not None:
-        query_params['api_end_date'] = api_end_date
-    if api_post_type is not None:
-        query_params['api_post_type'] = api_post_type
+    response = requests.get(token_url)
+    data = response.json()
     
-    # Pass all filters to timeline, including empty ones
+    access_token = data.get('access_token')
+    if not access_token:
+        return f'Error: No access token received - {data}', 400
+    
+    session['access_token'] = access_token
+    
+    # Build redirect to timeline
     params = {}
     if api_start_date is not None:
         params['api_start_date'] = api_start_date
@@ -238,34 +258,6 @@ def callback():
     redirect_url = url_for('timeline')
     if params:
         redirect_url += '?' + urlencode(params)
-    
-    print(f"Redirecting to timeline with: {redirect_url}")
-    
-    # Use the EXACT same redirect_uri that was used in the OAuth request (including query parameters)
-    token_url = (
-        f'https://graph.facebook.com/v18.0/oauth/access_token'
-        f'?client_id={FB_APP_ID}'
-        f'&redirect_uri={original_redirect_uri}'
-        f'&client_secret={FB_APP_SECRET}'
-        f'&code={code}'
-    )
-    
-    print(f"Token URL: {token_url}")
-    print(f"Using redirect_uri: {original_redirect_uri}")
-    print(f"Original redirect_uri from session: {original_redirect_uri}")
-    
-    response = requests.get(token_url)
-    data = response.json()
-    
-    print(f"Token response status: {response.status_code}")
-    print(f"Token response data: {data}")
-    
-    access_token = data.get('access_token')
-    
-    if not access_token:
-        return f'Error: No access token received - {data}', 400
-    
-    session['access_token'] = access_token
     
     return redirect(redirect_url)
 
@@ -287,12 +279,12 @@ def timeline():
         return f"Error fetching user data: {data['error']['message']}", 500
     user_data = data
     
-    # Get API filters from request (for data fetch)
+    # Get API filters from request
     api_start_date = request.args.get('api_start_date')
     api_end_date = request.args.get('api_end_date')
     api_post_type = request.args.get('api_post_type')
     
-    # Get display filters from request (for server-side filtering)
+    # Get display filters from request
     display_start_date = request.args.get('display_start_date')
     display_end_date = request.args.get('display_end_date')
     keyword = request.args.get('keyword')
@@ -303,15 +295,11 @@ def timeline():
     max_length = request.args.get('max_length')
     has_tags = request.args.get('has_tags')
     clear_filters = request.args.get('clear_filters')
+    fetch_comments = request.args.get('fetch_comments')  # New parameter
     
     # Clean up keyword parameter
     if keyword and (keyword.strip() == '' or keyword.lower() == 'none'):
         keyword = None
-    
-    # Debug: Print all filters
-    print(f"API filters - start: {api_start_date}, end: {api_end_date}, type: {api_post_type}")
-    print(f"Display filters - start: {display_start_date}, end: {display_end_date}, keyword: {keyword}, photo: {has_photo}, video: {has_video}, links: {has_links}")
-    print(f"Length filters - min: {min_length}, max: {max_length}, tags: {has_tags}")
     
     # Set defaults and validate API filters
     if api_start_date or api_end_date or api_post_type:
@@ -326,7 +314,7 @@ def timeline():
         except ValueError:
             return "Invalid API date format. Please ensure dates are in YYYY-MM-DD format.", 400
     
-    # Fetch posts from API (always fetch recent posts if no filters, or filtered posts if filters provided)
+    # Fetch posts from API
     if True:  # Always fetch posts
         # Convert dates to Unix timestamps for Facebook API
         since_param = ''
@@ -339,7 +327,6 @@ def timeline():
                 pass
         if api_end_date:
             try:
-                # Add 23:59:59 to end date to include the entire day
                 end_datetime = datetime.strptime(api_end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
                 end_timestamp = int(end_datetime.timestamp())
                 until_param = f'&until={end_timestamp}'
@@ -347,55 +334,37 @@ def timeline():
                 pass
         
         type_param = f'&type={api_post_type}' if api_post_type else ''
-        
-        # Set default limit based on whether filters are provided
         limit = '100' if (api_start_date or api_end_date or api_post_type) else '20'
         
         posts_url = (
-            f'https://graph.facebook.com/v18.0/me/feed'
+            f'https://graph.facebook.com/v18.0/me/posts'  # Changed from feed to posts for your own posts
             f'?access_token={access_token}'
-            f'&fields=id,message,created_time,link,attachments{{type,media_type,media,url,title,description,subattachments{{type,media_type,media,url,title,description}},target{{url}}}}'
+            f'&fields=id,message,created_time,link,from,attachments{{type,media_type,media,url,title,description,subattachments{{type,media_type,media,url,title,description}},target{{url}}}}'
             f'{since_param}{until_param}{type_param}&limit={limit}'
         )
         
         print(f"Facebook API URL: {posts_url}")
-        print(f"API Filters - Start: {api_start_date} ({since_param}), End: {api_end_date} ({until_param}), Type: {api_post_type}")
         
         posts_response = requests.get(posts_url)
         posts_data = posts_response.json()
         
-        print(f"API Response Status: {posts_response.status_code}")
-        print(f"API Response Keys: {list(posts_data.keys())}")
-
         if 'error' in posts_data:
-            print(f"API Error: {posts_data['error']}")
-            if 'Please reduce the amount of data' in posts_data.get('error', {}).get('message', ''):
-                return render_template('error.html', message="Error: Too much data requested. Please narrow the date range and retry."), 400
             return render_template('error.html', message=f"Error fetching posts: {posts_data['error']['message']}"), 500
-                
-        print(f"Raw API Response: {json.dumps(posts_data, indent=2)[:1000]}...")
         
-        # Store posts in database with multiple attachments
+        # Store posts in database
         with app.app_context():
             print(f"Processing {len(posts_data.get('data', []))} posts from API")
-            print(f"Posts data: {json.dumps(posts_data.get('data', [])[:2], indent=2)}")  # Show first 2 posts for debugging
             for post in posts_data.get('data', []):
                 existing_post = Post.query.filter_by(facebook_id=post['id']).first()
                 if not existing_post:
-                    # Debug: Print raw post data
-                    print(f"Processing post {post['id']}:")
-                    print(f"  Message: {post.get('message', '')[:100]}...")
-                    print(f"  Has attachments: {bool(post.get('attachments'))}")
-                    print(f"  Has link: {bool(post.get('link'))}")
-                    
-                    if post.get('attachments'):
-                        print(f"  Attachments count: {len(post['attachments'].get('data', []))}")
-                        for i, att in enumerate(post['attachments'].get('data', [])):
-                            print(f"    Attachment {i}: type={att.get('type')}, media_type={att.get('media_type')}")
-                    
                     try:
                         photos, videos, links = process_attachments(post)
-                        print(f"  Processed attachments: {len(photos) if photos else 0} photos, {len(videos) if videos else 0} videos, {len(links) if links else 0} links")
+                        from_data = post.get('from')
+                        
+                        # Fetch comments if requested
+                        comments = []
+                        if fetch_comments == 'yes':
+                            comments = process_comments(post['id'], access_token)
                         
                         new_post = Post(
                             facebook_id=post['id'],
@@ -403,26 +372,30 @@ def timeline():
                             created_time=post['created_time'],
                             photos=photos if photos else None,
                             videos=videos if videos else None,
-                            links=links if links else None
+                            links=links if links else None,
+                            from_data=from_data,
+                            comments=comments if comments else None
                         )
                         db.session.add(new_post)
-                        print(f"  Successfully added post {post['id']} to session")
+                        print(f"  Successfully added post {post['id']}")
+                        
+                        # Store individual comments in Comment table
+                        if comments:
+                            for comment in comments:
+                                existing_comment = Comment.query.filter_by(facebook_id=comment['id']).first()
+                                if not existing_comment:
+                                    new_comment = Comment(
+                                        facebook_id=comment['id'],
+                                        post_id=post['id'],
+                                        message=comment['message'],
+                                        created_time=comment['created_time'],
+                                        from_data=comment['from'],
+                                        like_count=comment['like_count']
+                                    )
+                                    db.session.add(new_comment)
+                        
                     except Exception as e:
                         print(f"  ERROR processing post {post['id']}: {e}")
-                        # Fallback: store basic post without attachments
-                        try:
-                            new_post = Post(
-                                facebook_id=post['id'],
-                                message=post.get('message', ''),
-                                created_time=post['created_time'],
-                                photos=None,
-                                videos=None,
-                                links=None
-                            )
-                            db.session.add(new_post)
-                            print(f"  Fallback: stored basic post {post['id']}")
-                        except Exception as e2:
-                            print(f"  CRITICAL ERROR: Could not store post {post['id']}: {e2}")
                 else:
                     print(f"Post {post['id']} already exists, skipping")
             
@@ -433,22 +406,16 @@ def timeline():
                 print(f"Database commit failed: {e}")
                 db.session.rollback()
     
-    # Server-side filtering for display
+    # Server-side filtering for display (same as before)
     query = Post.query.order_by(Post.created_time.desc())
     
-    # Apply display filters only if clear_filters is not true
     if clear_filters != 'true':
-        # Date filtering
         if display_start_date:
             query = query.filter(func.substring(Post.created_time, 1, 10) >= display_start_date)
         if display_end_date:
             query = query.filter(func.substring(Post.created_time, 1, 10) <= display_end_date)
-        
-        # Keyword filtering
         if keyword:
             query = query.filter(Post.message.ilike(f'%{keyword}%'))
-        
-        # Length filtering
         if min_length:
             try:
                 query = query.filter(func.length(Post.message) >= int(min_length))
@@ -459,25 +426,20 @@ def timeline():
                 query = query.filter(func.length(Post.message) <= int(max_length))
             except ValueError:
                 pass
-        
-        # Tags filtering
         if has_tags == 'yes':
             query = query.filter(Post.message.ilike('%@%'))
         elif has_tags == 'no':
             query = query.filter(~Post.message.ilike('%@%'))
     
-    # Get all posts first, then apply JSON filtering in Python
     all_posts = query.all()
     
-    # Apply JSON-based filters in Python
+    # Apply JSON-based filters
     filtered_posts = []
     for post in all_posts:
-        # Skip if clear_filters is true
         if clear_filters == 'true':
             filtered_posts.append(post)
             continue
         
-        # Photo filtering
         if has_photo == 'yes':
             if not post.photos or not isinstance(post.photos, list) or len(post.photos) == 0:
                 continue
@@ -485,7 +447,6 @@ def timeline():
             if post.photos and isinstance(post.photos, list) and len(post.photos) > 0:
                 continue
         
-        # Video filtering
         if has_video == 'yes':
             if not post.videos or not isinstance(post.videos, list) or len(post.videos) == 0:
                 continue
@@ -493,7 +454,6 @@ def timeline():
             if post.videos and isinstance(post.videos, list) and len(post.videos) > 0:
                 continue
         
-        # Links filtering
         if has_links == 'yes':
             if not post.links or not isinstance(post.links, list) or len(post.links) == 0:
                 continue
@@ -503,130 +463,43 @@ def timeline():
         
         filtered_posts.append(post)
     
-    db_posts = filtered_posts
-    print(f"Filtered posts count: {len(db_posts)}")    
-    return render_template('timeline.html', posts=db_posts, user_data=user_data)
+    return render_template('timeline.html', posts=filtered_posts, user_data=user_data)
 
-@app.route('/debug')
-def debug():
-    """Debug route to see raw API response"""
+@app.route('/refresh-comments/<post_id>')
+def refresh_comments(post_id):
+    """Refresh comments for a specific post"""
     if 'access_token' not in session:
         return redirect(url_for('login'))
+    
     access_token = session['access_token']
     
-    # Get a few recent posts with full attachment data
-    posts_url = (
-        f'https://graph.facebook.com/v18.0/me/feed'
-        f'?access_token={access_token}'
-        f'&fields=id,message,created_time,link,attachments{{type,media_type,media,url,title,description,subattachments{{type,media_type,media,url,title,description}},target{{url}}}}'
-        f'&limit=5'
-    )
+    # Fetch fresh comments
+    comments = process_comments(post_id, access_token)
     
-    response = requests.get(posts_url)
-    data = response.json()
-    
-    return f"<pre>{json.dumps(data, indent=2)}</pre>"
-
-@app.route('/db-debug')
-def db_debug():
-    """Debug route to see what's in the database"""
-    if 'access_token' not in session:
-        return redirect(url_for('login'))
-    
-    with app.app_context():
-        posts = Post.query.order_by(Post.created_time.desc()).limit(10).all()
-        db_data = []
-        for post in posts:
-            db_data.append({
-                'id': post.id,
-                'facebook_id': post.facebook_id,
-                'message': post.message[:100] + '...' if post.message and len(post.message) > 100 else post.message,
-                'created_time': post.created_time,
-                'photos_count': len(post.photos) if post.photos else 0,
-                'videos_count': len(post.videos) if post.videos else 0,
-                'links_count': len(post.links) if post.links else 0,
-                'photos': post.photos,
-                'videos': post.videos,
-                'links': post.links
-            })
-    
-    return f"<pre>{json.dumps(db_data, indent=2)}</pre>"
-
-@app.route('/test-fetch')
-def test_fetch():
-    """Test route to fetch posts without any filters"""
-    if 'access_token' not in session:
-        return redirect(url_for('login'))
-    access_token = session['access_token']
-    
-    # Simple API call without any filters
-    posts_url = (
-        f'https://graph.facebook.com/v18.0/me/feed'
-        f'?access_token={access_token}'
-        f'&fields=id,message,created_time,link,attachments{{type,media_type,media,url,title,description,subattachments{{type,media_type,media,url,title,description}},target{{url}}}}'
-        f'&limit=10'
-    )
-    
-    print(f"Test fetch URL: {posts_url}")
-    response = requests.get(posts_url)
-    data = response.json()
-    
-    print(f"Test fetch response: {json.dumps(data, indent=2)}")
-    
-    return f"<pre>{json.dumps(data, indent=2)}</pre>"
-
-@app.route('/force-fetch')
-def force_fetch():
-    """Force fetch and store posts without any filters"""
-    if 'access_token' not in session:
-        return redirect(url_for('login'))
-    access_token = session['access_token']
-    
-    # Simple API call to fetch recent posts
-    posts_url = (
-        f'https://graph.facebook.com/v18.0/me/feed'
-        f'?access_token={access_token}'
-        f'&fields=id,message,created_time,link,attachments{{type,media_type,media,url,title,description,subattachments{{type,media_type,media,url,title,description}},target{{url}}}}'
-        f'&limit=10'
-    )
-    
-    print(f"Force fetch URL: {posts_url}")
-    response = requests.get(posts_url)
-    data = response.json()
-    
-    if 'error' in data:
-        return f"<pre>Error: {json.dumps(data, indent=2)}</pre>"
-    
-    # Store posts in database
-    with app.app_context():
-        stored_count = 0
-        for post in data.get('data', []):
-            existing_post = Post.query.filter_by(facebook_id=post['id']).first()
-            if not existing_post:
-                try:
-                    photos, videos, links = process_attachments(post)
-                    new_post = Post(
-                        facebook_id=post['id'],
-                        message=post.get('message', ''),
-                        created_time=post['created_time'],
-                        photos=photos if photos else None,
-                        videos=videos if videos else None,
-                        links=links if links else None
-                    )
-                    db.session.add(new_post)
-                    stored_count += 1
-                    print(f"Stored post {post['id']}")
-                except Exception as e:
-                    print(f"Error storing post {post['id']}: {e}")
+    # Update post in database
+    post = Post.query.filter_by(facebook_id=post_id).first()
+    if post:
+        post.comments = comments if comments else None
         
-        try:
-            db.session.commit()
-            return f"<h2>Force Fetch Complete</h2><p>Stored {stored_count} new posts</p><pre>{json.dumps(data, indent=2)}</pre>"
-        except Exception as e:
-            db.session.rollback()
-            return f"<h2>Force Fetch Failed</h2><p>Error: {e}</p><pre>{json.dumps(data, indent=2)}</pre>"
+        # Update Comment table
+        for comment in comments:
+            existing_comment = Comment.query.filter_by(facebook_id=comment['id']).first()
+            if not existing_comment:
+                new_comment = Comment(
+                    facebook_id=comment['id'],
+                    post_id=post_id,
+                    message=comment['message'],
+                    created_time=comment['created_time'],
+                    from_data=comment['from'],
+                    like_count=comment['like_count']
+                )
+                db.session.add(new_comment)
+        
+        db.session.commit()
+    
+    return redirect(url_for('timeline'))
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()  # Only create tables if they don't exist
+        db.create_all()
     app.run(debug=True, port=5000)
