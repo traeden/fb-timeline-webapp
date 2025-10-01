@@ -18,14 +18,18 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="container mt-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="mb-0">Your Facebook Timeline</h1>
-        <div class="d-flex gap-2">
-            <a href="{{ url_for('timeline') }}?fetch_comments=yes{% if request.args.get('api_start_date') %}&api_start_date={{ request.args.get('api_start_date') }}{% endif %}{% if request.args.get('api_end_date') %}&api_end_date={{ request.args.get('api_end_date') }}{% endif %}{% if request.args.get('api_post_type') %}&api_post_type={{ request.args.get('api_post_type') }}{% endif %}" class="btn btn-outline-primary">
+    <div class="d-flex gap-2">
+            <a href="{{ url_for('import_data') }}" class="btn btn-outline-success">
+                <i class="fas fa-file-import"></i> Import Data
+            </a>
+            <a href="{{ url_for('timeline') }}?fetch_comments=yes..." class="btn btn-outline-primary">
                 <i class="fas fa-comments"></i> Fetch Comments
             </a>
             <a href="{{ url_for('home') }}" class="btn btn-outline-secondary">        
                 <i class="fas fa-arrow-left"></i> Back
         </a>
     </div>
+    
     
     <!-- Filter Form -->
     <div class="card mb-2">

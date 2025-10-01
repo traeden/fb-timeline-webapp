@@ -6,27 +6,45 @@ Created on Fri Sep 12 12:54:57 2025
 @author: traedennord
 """
 
-from flask import Flask, redirect, request, session, url_for, render_template
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, redirect, request, session, url_for, render_template, flash
 from flask_bootstrap import Bootstrap
+from werkzeug.utils import secure_filename
 import os
 from dotenv import load_dotenv
 import requests
-import json
 from datetime import datetime, timedelta
-from sqlalchemy import func, or_, and_, text
 from urllib.parse import urlencode
+from sqlalchemy import func, or_, and_, text
+
+"""from flask_sqlalchemy import SQLAlchemy
+import json
 from sqlalchemy.dialects.postgresql import JSON
+"""
+
+
+
+# Import models and importer
+from models import db, Post, Comment
+from facebook_import import FacebookDataImporter
 
 load_dotenv()
 app = Flask(__name__)
 bootstrap = Bootstrap(app)
 
 app.secret_key = 'xyz789abc123'
-
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://localhost/timeline'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max
+
+# Initialize database with app
+db.init_app(app)
+
+# Ensure upload folder exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+
+"""db = SQLAlchemy(app)
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -46,7 +64,7 @@ class Comment(db.Model):
     message = db.Column(db.Text)
     created_time = db.Column(db.String(50))
     from_data = db.Column(JSON, nullable=True)  # Commenter information
-    like_count = db.Column(db.Integer, default=0)
+    like_count = db.Column(db.Integer, default=0)"""
 
 FB_APP_ID = os.getenv('FB_APP_ID')
 FB_APP_SECRET = os.getenv('FB_APP_SECRET')
@@ -464,6 +482,52 @@ def timeline():
         filtered_posts.append(post)
     
     return render_template('timeline.html', posts=filtered_posts, user_data=user_data)
+
+
+@app.route('/import-data', methods=['GET', 'POST'])
+def import_data():
+    if request.method == 'POST':
+        if 'facebook_data' not in request.files:
+            flash('No file uploaded', 'error')
+            return redirect(request.url)
+        
+        file = request.files['facebook_data']
+        if file.filename == '':
+            flash('No file selected', 'error')
+            return redirect(request.url)
+        
+        if file and file.filename.endswith('.zip'):
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            
+            # Extract zip
+            import zipfile
+            extract_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'extracted')
+            os.makedirs(extract_dir, exist_ok=True)
+            
+            with zipfile.ZipFile(filepath, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+            
+            # Import data
+            importer = FacebookDataImporter(extract_dir)
+            stats = importer.import_all()
+            
+            # Clean up
+            os.remove(filepath)
+            
+            flash(f"Import complete! Posts: {stats['posts_imported']} imported, "
+                  f"{stats['posts_updated']} updated, {stats['posts_skipped']} skipped. "
+                  f"Comments: {stats['comments_imported']} imported.", 'success')
+            
+            if stats['errors']:
+                for error in stats['errors'][:5]:  # Show first 5 errors
+                    flash(error, 'warning')
+            
+            return redirect(url_for('timeline'))
+    
+    return render_template('import.html')
+
 
 @app.route('/refresh-comments/<post_id>')
 def refresh_comments(post_id):
