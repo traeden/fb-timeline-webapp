@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Sep 30 22:55:03 2025
+
+@author: traedennord
+"""
+
+{% extends "bootstrap/base.html" %}
+{% block title %}Import Facebook Data{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1>Import Facebook Data</h1>
+    
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title">How to Download Your Facebook Data</h5>
+            <ol>
+                <li>Click Profile Picture Account → Settings & Privacy → Settings → Search Accounts Center → Your Information And Permissions → Export Your Information → Create Export</li>
+                <li>Choose Facebook Profile
+                <li>Export to device
+                <li>Select date range and format:
+                    <ul>
+                        <li>Format: <strong>JSON</strong> (required)</li>
+                        <li>Customize Information: 
+                            <ul>
+                                <li> <p style="color: blue;">Clear All in All Sections (9 Times)</p> </li>
+                                <li>✓ Posts </li>
+                                <li>Save</li>
+                           </ul>
+                    </ul>
+                </li>
+                <li>Start Export (Facebook will email you with a link when ready)</li>
+                <li>Download the ZIP file (don't extract it)</li>
+                <li>Upload it here</li>
+            </ol>
+        </div>
+    </div>
+    
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title">Upload Facebook Data</h5>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <form method="POST" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="facebook_data" class="form-label">Select Facebook Data ZIP File</label>
+                    <input type="file" class="form-control" id="facebook_data" name="facebook_data" 
+                           accept=".zip" required>
+                    <small class="text-muted">Must be a ZIP file from Facebook's official data download</small>
+                </div>
+                
+                <div class="alert alert-info">
+                    <strong>Note:</strong> This will merge with existing data. Posts from API calls and 
+                    imports will be combined. Duplicates will be handled automatically.
+                </div>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-upload"></i> Import Data
+                </button>
+                <a href="{{ url_for('timeline') }}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
