@@ -26,7 +26,7 @@ Created on Thu Sep 11 12:14:40 2025
                     <small class="opacity-75">These filters limit the data fetched from Facebook's API</small>
                 </div>
                 <div class="card-body">
-                    <form method="GET" action="/login">
+                    <form method="GET" action="/login-v2">
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="api_start_date" class="form-label fw-semibold">
@@ -44,7 +44,7 @@ Created on Thu Sep 11 12:14:40 2025
                                        class="form-control form-control-lg">
                                 <small class="text-muted">Fetch posts up to this date</small>
                             </div>
-                            <div class="col-12">
+                            <div class="col-md-6">
                                 <label for="api_post_type" class="form-label fw-semibold">
                                     <i class="fas fa-layer-group me-1"></i>Post Type
                                 </label>
@@ -57,6 +57,25 @@ Created on Thu Sep 11 12:14:40 2025
                                 </select>
                                 <small class="text-muted">Filter by specific content type</small>
                             </div>
+                            <div class="col-md-6">
+                                <label for="media_quality" class="form-label fw-semibold">
+                                    <i class="fas fa-image me-1"></i>Media Quality
+                                </label>
+                                <select id="media_quality" name="media_quality" 
+                                        class="form-select form-select-lg">
+                                    <option value="high" selected>🔥 High (Best Quality, Larger Files)</option>
+                                    <option value="medium">⚡ Medium (Balanced)</option>
+                                    <option value="low">💾 Low (Faster, Smaller Files)</option>
+                                </select>
+                                <small class="text-muted">Higher quality uses more storage space</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Storage Info Alert -->
+                        <div class="alert alert-info mt-3" role="alert">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Note:</strong> Media will be downloaded and stored locally. 
+                            <span id="quality-info">High quality photos are up to 1920px and use ~2-5MB per photo.</span>
                         </div>
                         
                         <!-- Submit Button -->
@@ -71,8 +90,9 @@ Created on Thu Sep 11 12:14:40 2025
                     </form>
                 </div>
             </div>
-            <!-- Spacer to Add Whitespace -->
-            <div style="height: 100px;"></div> <!-- Adjust height (e.g., 50px, 100px, 150px) to control whitespace -->
+            
+            <!-- Spacer -->
+            <div style="height: 100px;"></div>
 
             <!-- Info Section -->
             <div class="row mt-5 mb-5">
@@ -85,7 +105,7 @@ Created on Thu Sep 11 12:14:40 2025
                             </div>
                         </div>
                         <h6 class="fw-semibold mt-0">Secure</h6>
-                        <small class="text-muted">Your data stays private</small>
+                        <small class="text-muted">Your data stays private and local</small>
                     </div>
                 </div>
                 <div class="col-md-4">
@@ -93,11 +113,11 @@ Created on Thu Sep 11 12:14:40 2025
                         <div class="icon-container" style="position: absolute; top: -50px; left: 50%; transform: translateX(-50%);">
                             <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center" 
                                  style="width: 150px; height: 150px;">
-                                <i class="fas fa-search text-primary" style="font-size: 4.5rem;"></i>
+                                <i class="fas fa-download text-primary" style="font-size: 4.5rem;"></i>
                             </div>
                         </div>
-                        <h6 class="fw-semibold mt-0">Searchable</h6>
-                        <small class="text-muted">Find specific posts easily</small>
+                        <h6 class="fw-semibold mt-0">Downloaded</h6>
+                        <small class="text-muted">Media saved locally, never expires</small>
                     </div>
                 </div>
                 <div class="col-md-4">
@@ -115,16 +135,32 @@ Created on Thu Sep 11 12:14:40 2025
             </div>
 
             <!-- Tips -->
-            <div class="alert alert-info mt-5" role="alert">
-                <i class="fas fa-info-circle me-2"></i>
+            <div class="alert alert-warning mt-5" role="alert">
+                <i class="fas fa-lightbulb me-2"></i>
                 <strong>Tip:</strong> Leave filters empty to fetch all available data. You can apply additional filters after logging in.
             </div>
         </div>
     </div>
 </div>
 
-<!-- Add Font Awesome for icons (if not already included) -->
+<!-- Add Font Awesome for icons -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<!-- Dynamic quality info update -->
+<script>
+document.getElementById('media_quality').addEventListener('change', function() {
+    const infoText = document.getElementById('quality-info');
+    const quality = this.value;
+    
+    if (quality === 'low') {
+        infoText.textContent = 'Low quality photos are up to 800px and use ~500KB-1MB per photo.';
+    } else if (quality === 'medium') {
+        infoText.textContent = 'Medium quality photos are up to 1200px and use ~1-3MB per photo.';
+    } else {
+        infoText.textContent = 'High quality photos are up to 1920px and use ~2-5MB per photo.';
+    }
+});
+</script>
 
 <style>
     .card {
@@ -144,7 +180,7 @@ Created on Thu Sep 11 12:14:40 2025
         font-weight: 300;
     }
     .icon-container {
-        margin-bottom: 10px; /* Adjust this value to fine-tune the gap between icons and text */
+        margin-bottom: 10px;
     }
 </style>
 {% endblock %}

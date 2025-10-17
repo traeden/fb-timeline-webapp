@@ -19,23 +19,21 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="mb-0">Your Facebook Timeline</h1>
     <div class="d-flex gap-2">
+            <a href="{{ url_for('home') }}" class="btn btn-outline-secondary">        
+                <i class="fas fa-search"></i> Query Data
+            </a>
             <a href="{{ url_for('import_data') }}" class="btn btn-outline-success">
                 <i class="fas fa-file-import"></i> Import Data
             </a>
-            <a href="{{ url_for('timeline') }}?fetch_comments=yes..." class="btn btn-outline-primary">
+            <a href="{{ url_for('timeline_v2') }}?fetch_comments=yes" class="btn btn-outline-primary">
                 <i class="fas fa-comments"></i> Fetch Comments
-            </a>
-            <a href="{{ url_for('home') }}" class="btn btn-outline-secondary">        
-                <i class="fas fa-arrow-left"></i> Back
         </a>
-    </div>
-    
-    
+    </div>        
     <!-- Filter Form -->
     <div class="card mb-2">
         <div class="card-body">
             <h5 class="card-title">Filter Posts</h5>
-            <form method="GET" action="{{ url_for('timeline') }}" class="row g-3">
+            <form method="GET" action="{{ url_for('timeline_v2') }}" class="row g-3">
                 <!-- Preserve API filters as hidden inputs -->
                 {% if request.args.get('api_start_date') %}
                     <input type="hidden" name="api_start_date" value="{{ request.args.get('api_start_date') }}">
@@ -102,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="col-md-3 d-flex align-items-end">
                     <div class="d-flex gap-2 w-100" style="margin-top: 25px;">
                         <button type="submit" class="btn btn-primary flex-fill">Apply Filters</button>
-                        <a href="{{ url_for('timeline') }}?clear_filters=true{% if request.args.get('api_start_date') %}&api_start_date={{ request.args.get('api_start_date') }}{% endif %}{% if request.args.get('api_end_date') %}&api_end_date={{ request.args.get('api_end_date') }}{% endif %}{% if request.args.get('api_post_type') %}&api_post_type={{ request.args.get('api_post_type') }}{% endif %}" class="btn btn-secondary flex-fill">Clear Filters</a>
+                        <a href="{{ url_for('timeline_v2') }}?clear_filters=true{% if request.args.get('api_start_date') %}&api_start_date={{ request.args.get('api_start_date') }}{% endif %}{% if request.args.get('api_end_date') %}&api_end_date={{ request.args.get('api_end_date') }}{% endif %}{% if request.args.get('api_post_type') %}&api_post_type={{ request.args.get('api_post_type') }}{% endif %}" class="btn btn-secondary flex-fill">Clear Filters</a>
                     </div>
                 </div>
             </form>
@@ -165,8 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         {% endif %}
 
                         <!-- Media Gallery -->
-                        {% if post.photos or post.videos %}
-                            {% set combined_media = [] %}
+                        {% if (post.photos and post.photos|length > 0) or (post.videos and post.videos|length > 0) %}                            {% set combined_media = [] %}
                             {% if post.photos %}
                                 {% for photo in post.photos %}
                                     {% set _ = combined_media.append({
@@ -1013,7 +1010,7 @@ window.postMediaData = {};
 window.postCommentsData = {};
 
 {% for post in posts %}
-    {% if post.photos or post.videos %}
+    {% if (post.photos and post.photos|length > 0) or (post.videos and post.videos|length > 0) %}
         {% set combined_media = [] %}
         {% if post.photos %}
             {% for photo in post.photos %}

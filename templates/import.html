@@ -18,15 +18,15 @@ Created on Tue Sep 30 22:55:03 2025
             <h5 class="card-title">How to Download Your Facebook Data</h5>
             <ol>
                 <li>Click Profile Picture Account → Settings & Privacy → Settings → Search Accounts Center → Your Information And Permissions → Export Your Information → Create Export</li>
-                <li>Choose Facebook Profile
-                <li>Export to device
+                <li>Choose Facebook Profile</li>
+                <li>Export to device</li>
                 <li>Select date range and format:
                     <ul>
                         <li>Format: <strong>JSON</strong> (required)</li>
                         <li>Customize Information: 
                             <ul>
-                                <li> <p style="color: blue;">Clear All in All Sections (9 Times)</p> </li>
-                                <li>✓ Posts </li>
+                                <li><p style="color: blue;">Clear All in All Sections (9 Times)</p></li>
+                                <li>✓ Posts</li>
                                 <li>Save</li>
                            </ul>
                     </ul>
@@ -65,10 +65,17 @@ Created on Tue Sep 30 22:55:03 2025
                     imports will be combined. Duplicates will be handled automatically.
                 </div>
                 
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-upload"></i> Import Data
-                </button>
-                <a href="{{ url_for('timeline') }}" class="btn btn-secondary">Cancel</a>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Import Data
+                    </button>
+                    <a href="{{ url_for('timeline_v2') }}" class="btn btn-success">
+                        <i class="fas fa-eye"></i> See Timeline
+                    </a>
+                    <a href="{{ url_for('home') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> Query Data
+                    </a>
+                </div>
             </form>
         </div>
     </div>
